@@ -1,8 +1,9 @@
 # Próximo paso — la tasa de supervivencia está confundida con la antigüedad
 
-**Estado:** Paso 1 hecho, hipótesis confirmada. El bloqueante sigue abierto: la
-tasa cruda no se puede usar y todavía no está el análisis de supervivencia que
-la reemplaza (Paso 2). No construir features hasta resolverlo.
+**Estado:** Pasos 1 y 2 hechos. La hipótesis quedó confirmada y el análisis de
+supervivencia está implementado y testeado, pero **todavía no corrió sobre los
+datos reales**: falta validarlo con el histórico descargado (ver "Estado" en el
+Paso 2). No construir features hasta ver esa salida.
 **Contexto general:** `CLAUDE.md`. **Plan por fases:** `docs/roadmap.md`.
 
 ---
@@ -127,36 +128,103 @@ No es un bloqueante para el Paso 2. La vía del nomenclador ya confirma que la
 tasa no sirve para comparar rubros, y el nomenclador es un marcador de época:
 el cruce contra el año mediría lo mismo con otro reloj.
 
-## Paso 2 — reemplazar la tasa por análisis de supervivencia
+## Paso 2 — reemplazar la tasa por análisis de supervivencia (implementado)
+
+```bash
+cd pipeline && source .venv/bin/activate
+python -m viabilidad supervivencia
+```
 
 No es un parche: es lo que el roadmap ya preveía en Fase 3.2. La pregunta deja
 de ser *"¿sigue vigente hoy?"* —que premia al que abrió hace poco— y pasa a ser
 *"¿qué probabilidad tiene de llegar a los 3 años?"*, comparable entre rubros y
 entre épocas.
 
-Con `lifelines`:
+### Corrección: la receta de este documento estaba mal
 
-- **Duración:** `fechavencimientohab - fechahabaprobada` para las vencidas;
-  `hoy - fechahabaprobada` para las que siguen vigentes.
-- **Evento:** 1 si venció, 0 si sigue vigente (censurada a derecha).
-- **Kaplan-Meier por rubro** para las curvas de supervivencia.
-- **Métrica comparable:** supervivencia a 3 y a 5 años, no "tasa de vigentes".
-- **Cox** después, para meter las variables explicativas.
+Como estaba escrita acá, la construcción era:
 
-Sanity check: la curva de gastronomía tiene que quedar **por debajo** de la de
-farmacia. Si da al revés, el problema sigue ahí.
+    duración = fechavencimientohab - fechahabaprobada   (para las vencidas)
+    evento   = 1 si venció
 
-### Cuidados
+**Tomada literal, reproduce el bug del Paso 1 en forma más sofisticada.** Esa
+resta no es la vida del comercio: es el plazo que el municipio otorgó. Si los
+permisos duran ~5 años, toda habilitación vencida dura ~5 años por definición
+administrativa, y toda vigente dura menos porque todavía no llegó. Kaplan-Meier
+sobre eso da una curva plana con un escalón a los 5 años, y lo único que separa
+a un rubro de otro vuelve a ser qué proporción de sus registros es reciente.
+Época disfrazada de supervivencia, otra vez, pero ahora con `lifelines` adelante
+dándole aire de rigor.
 
-- **Validación espacial, no aleatoria:** particionar por `barrio_identificado`.
-  Un split aleatorio deja vecinos en train y test e infla las métricas.
-- **Validación temporal:** entrenar con años previos a un corte, testear después.
-- **Competencia en U invertida:** pocos competidores puede ser mercado
+Lo que distingue a un comercio que sobrevive no es que su permiso venza —vence
+siempre— sino **si lo renovó**. Así que la unidad de análisis no es la
+habilitación sino el **período de actividad** de un titular en una dirección,
+que puede encadenar varias:
+
+    spell  = habilitaciones sucesivas de (cuitempresa, nro_catastral) sin un
+             hueco mayor a un año entre el vencimiento de una y el alta de la
+             siguiente
+    cierre = la cobertura caducó y nadie renovó
+    censura = todavía tiene permiso vigente
+
+El documento traía esto como una advertencia menor al final del Paso 2
+("revisar si una renovación figura como habilitación nueva"). No es menor: es
+la diferencia entre medir el negocio y medir el calendario.
+
+### Qué hace el módulo
+
+`pipeline/src/viabilidad/supervivencia.py`:
+
+| Función | Rol |
+|---|---|
+| `plazos()` | Mide el supuesto antes de usarlo: ¿el plazo otorgado es constante? |
+| `consolidar()` | Encadena renovaciones en períodos de actividad |
+| `duraciones()` | Duración y evento, con censura a derecha explícita |
+| `kaplan_meier()` | Curvas por nivel1 y nivel2, con supervivencia a 3 y 5 años |
+
+Dos cuidados que no estaban en el plan y que el código aplica:
+
+- **Período de gracia.** Un permiso vencido hace un mes todavía puede renovarse
+  fuera de término. Darlo por cerrado inventa cierres, y los inventa justo entre
+  los más recientes, que es exactamente el sesgo que se está tratando de sacar.
+  Dentro del año de gracia se censura.
+- **Huecos.** Un titular que se va y vuelve tres años después no renovó: son dos
+  comercios. Un hueco mayor a un año abre un período nuevo.
+
+### Estado
+
+Implementado y cubierto por 7 tests, **pero sin correr sobre los datos reales**:
+en esta sesión `gis.cordoba.gob.ar` está bloqueado por política de egress, así
+que no hay `data/crudo/historial.parquet`.
+
+Los tests corren sobre datos sintéticos que imitan la estructura real (plazos de
+5 años fijos, renovaciones como filas nuevas). Uno de ellos,
+`test_sin_consolidar_los_dos_rubros_se_ven_iguales`, es el que fija la
+corrección: construye dos rubros con vidas de 20 y 5 años y verifica que, medidos
+habilitación por habilitación, den la misma mediana. Si alguien saca la
+consolidación, ese test falla.
+
+**Lo que hay que mirar al correrlo con datos reales**, en este orden:
+
+1. `plazos()`: si el desvío es chico, el diagnóstico de arriba queda confirmado
+   sobre los datos y no solo sobre los sintéticos. Si el plazo resulta variar
+   mucho por rubro, hay que revisar esta lógica, no aplicarla de taquito.
+2. Cuántos períodos quedan con al menos una renovación. Si son casi cero, el
+   supuesto de que las renovaciones se cargan como altas nuevas es falso y hay
+   que averiguar cómo se registra realmente una renovación antes de seguir.
+3. El chequeo de dominio: gastronomía tiene que quedar **por debajo** de
+   farmacia. El módulo lo imprime y lo marca. Si da al revés o empatado, el
+   objetivo sigue midiendo otra cosa y el Paso 3 sigue bloqueado.
+
+### Lo que falta
+
+- **Cox** con las variables explicativas, una vez que existan las features.
+- **Validación espacial**, particionando por `barrio_identificado`: un split
+  aleatorio deja vecinos en train y test e infla las métricas.
+- **Validación temporal**: entrenar con años previos a un corte, testear después.
+- **Competencia en U invertida**: pocos competidores puede ser mercado
   inexistente; muchos, saturación; un nivel intermedio, aglomeración
   beneficiosa. No asumir monotonicidad.
-- Revisar si una renovación figura como habilitación nueva. Si es así, un local
-  de 20 años aparece como varios cortos y hay que consolidarlo por
-  `cuitempresa` + `nro_catastral` antes de medir duraciones.
 
 ## Paso 3 — recién ahí, las features
 
@@ -178,16 +246,28 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -e '.[dev]'
 cd .. && pre-commit install && cd pipeline
 
-python -m viabilidad todo      # descarga, agrega y escribe los resúmenes
+python -m viabilidad todo            # descarga, agrega y escribe los resúmenes
+python -m viabilidad diagnostico     # Paso 1: ¿la tasa mide el nomenclador?
+python -m viabilidad supervivencia   # Paso 2: Kaplan-Meier por rubro
 pytest
 ```
+
+`diagnostico` corre sin haber descargado nada (se apoya en tablas versionadas) y
+amplía el análisis si encuentra el histórico. `supervivencia` sí necesita
+`ingest` previo.
 
 `data/` está gitignoreado; los resúmenes de `referencia/` y los `resumen_*.csv`
 sí se versionan (son agregados, sin CUIT ni razón social).
 
 ## Lección de esta fase
 
-Dos bugs seguidos produjeron tablas con pinta de resultado en vez de fallar:
-`vigente` nulo leído como cierre, y ahora la antigüedad disfrazada de
-supervivencia. **Ante un resultado llamativo, primero buscar el artefacto.** Un
-95,6% de supervivencia en gastronomía es un bug, no un hallazgo.
+Tres veces seguidas, lo que parecía un resultado era un artefacto: `vigente`
+nulo leído como cierre, la antigüedad disfrazada de supervivencia, y la receta
+del Paso 2 que iba a medir el plazo del permiso creyendo medir la vida del
+comercio. **Ante un resultado llamativo, primero buscar el artefacto.** Un 95,6%
+de supervivencia en gastronomía es un bug, no un hallazgo.
+
+La tercera agrega algo a la lección: el artefacto no estaba en el código sino en
+el plan, y venía envuelto en una herramienta correcta. Usar `lifelines` no
+protege de medir la variable equivocada. **Antes de aplicar un método, medir el
+supuesto que lo habilita** — que es para lo que existe `plazos()`.

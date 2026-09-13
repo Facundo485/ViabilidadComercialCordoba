@@ -7,7 +7,7 @@ import logging
 
 import polars as pl
 
-from . import arcgis, config, diagnostico, ingest, manzanas, mapeo, resumen
+from . import arcgis, config, diagnostico, ingest, manzanas, mapeo, resumen, supervivencia
 
 
 def _log():
@@ -58,6 +58,11 @@ def cmd_diagnostico(_) -> None:
     diagnostico.ejecutar()
 
 
+def cmd_supervivencia(_) -> None:
+    """Kaplan-Meier por rubro, consolidando renovaciones."""
+    supervivencia.ejecutar()
+
+
 def cmd_todo(args) -> None:
     ingest.ejecutar()
     _resumen(manzanas.ejecutar())
@@ -84,6 +89,7 @@ COMANDOS = {
     "manzanas": cmd_manzanas,
     "resumen": cmd_resumen,
     "diagnostico": cmd_diagnostico,
+    "supervivencia": cmd_supervivencia,
     "todo": cmd_todo,
 }
 

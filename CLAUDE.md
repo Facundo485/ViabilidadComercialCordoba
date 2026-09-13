@@ -224,9 +224,10 @@ React/
     │   ├── rubros.py          # reglas de agrupamiento
     │   ├── mapeo.py           # genera mapeo_rubros.csv
     │   ├── ingest.py          # descarga y limpia
-    │   ├── manzanas.py        # agrega a manzana y calcula supervivencia
+    │   ├── manzanas.py        # agrega a manzana (su tasa_supervivencia está viciada)
     │   ├── resumen.py         # CSV agregados para revisar o commitear
     │   ├── diagnostico.py     # chequea que la tasa no mida antigüedad
+    │   ├── supervivencia.py   # Kaplan-Meier sobre períodos de actividad
     │   └── cli.py
     └── tests/
 ```
@@ -240,7 +241,13 @@ resto del proyecto. Cuando aparezcan las features y el modelo van como
 `pipeline/` queda como un proyecto Python instalable aparte, para que el backend
 y el frontend puedan sumarse como carpetas hermanas sin mezclarse.
 
-Comandos: `python -m viabilidad {rubros|mapeo|ingest|manzanas|resumen|diagnostico|todo}`.
+Comandos:
+
+```
+python -m viabilidad {rubros|mapeo|ingest|manzanas|resumen|todo}
+python -m viabilidad diagnostico     # ¿la tasa mide el nomenclador? (no necesita red)
+python -m viabilidad supervivencia   # Kaplan-Meier por rubro (necesita ingest previo)
+```
 
 ## Convenciones
 
@@ -300,6 +307,17 @@ se parece a esa proporción, *es* esa proporción. Un modelo de dos parámetros
 el rubro— explica el 87% de la varianza entre rubros. La tabla de supervivencia
 por rubro no contiene información sobre los rubros.
 
-Hay que reemplazar la tasa por análisis de supervivencia con `lifelines` antes
-de construir features sobre un objetivo que mide otra cosa. El detalle, el
-diagnóstico y los pasos están en **`docs/proximo-paso.md`**.
+**El reemplazo está implementado** (`supervivencia.py`, Kaplan-Meier con
+`lifelines`), pero todavía no corrió sobre los datos reales. Falta esa
+validación antes de dar el bloqueante por cerrado.
+
+**La unidad de análisis no es la habilitación: es el período de actividad.** La
+resta `fechavencimientohab - fechahabaprobada` no mide la vida del comercio sino
+el plazo que otorgó el municipio, que es ~constante. Medida así, una habilitación
+vencida dura ~5 años por definición administrativa y Kaplan-Meier vuelve a medir
+época. Lo que separa al que sobrevive es **si renovó**, así que hay que encadenar
+las habilitaciones sucesivas de un mismo `cuitempresa` en un mismo
+`nro_catastral`. No revertir a medir habilitaciones sueltas: hay un test que lo
+impide (`test_sin_consolidar_los_dos_rubros_se_ven_iguales`).
+
+El detalle, el diagnóstico y los pasos están en **`docs/proximo-paso.md`**.
