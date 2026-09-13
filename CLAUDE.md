@@ -1,5 +1,8 @@
 # CLAUDE.md — Contexto del proyecto
 
+> **¿Sesión nueva? Empezá por [`docs/retomar.md`](docs/retomar.md):** dice en
+> qué paso está el proyecto, qué comando correr y qué mirar en la salida.
+
 ## Qué es este proyecto
 
 Plataforma que asigna un **score de viabilidad comercial** a ubicaciones urbanas. Responde dos preguntas:
@@ -209,6 +212,8 @@ de servirlas — sin simplificar son varios MB y matan el navegador.
 React/
 ├── CLAUDE.md
 ├── docs/
+│   ├── retomar.md         # por dónde seguir (leer primero)
+│   ├── proximo-paso.md    # el bloqueante de la variable objetivo, en detalle
 │   └── roadmap.md
 └── pipeline/
     ├── pyproject.toml
