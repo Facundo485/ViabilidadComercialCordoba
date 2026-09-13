@@ -6,7 +6,7 @@ import logging
 
 import polars as pl
 
-from . import arcgis, config
+from . import arcgis, config, mapeo
 
 log = logging.getLogger(__name__)
 
@@ -63,41 +63,35 @@ def descargar_historial() -> pl.DataFrame:
     df = _a_fecha(pl.DataFrame(filas), FECHAS_HISTORIAL)
 
     return df.with_columns(
-        pl.col("nro_catastral").str.slice(0, config.LARGO_ID_MANZANA).alias("manzana"),
-        _clasificar_rubro(),
+        pl.col("nro_catastral").str.slice(0, config.LARGO_ID_MANZANA).alias("manzana")
     )
+    return _con_rubro(df)
 
 
-def _normalizado() -> pl.Expr:
-    """`rubronombre` comparable: minúsculas, sin acentos, espacios colapsados.
+def _con_rubro(df: pl.DataFrame) -> pl.DataFrame:
+    """Adjunta nivel1/nivel2 uniendo contra referencia/mapeo_rubros.csv.
 
-    Hace falta porque el campo mezcla dos nomencladores (municipal en Título con
-    acentos, CLANAE en MAYÚSCULAS) y hay entradas que solo difieren en un espacio
-    doble.
+    La fuente de verdad es el CSV, no las reglas de rubros.py: corregir una
+    clasificación es editar una fila, y el diff muestra qué cambió. Regenerarlo
+    desde las reglas es `python -m viabilidad mapeo`.
     """
-    expr = pl.col("rubronombre").fill_null("").str.to_lowercase()
-    for acento, plano in config.ACENTOS.items():
-        expr = expr.str.replace_all(acento, plano, literal=True)
-    return expr.str.replace_all(r"\s+", " ").str.strip_chars()
+    ruta = config.DIR_REFERENCIA / mapeo.ARCHIVO
+    if not ruta.exists():
+        raise FileNotFoundError(
+            f"Falta {ruta}. Corré `python -m viabilidad mapeo` para generarlo."
+        )
+    tabla = pl.read_csv(ruta).select("rubronombre", "nivel2", "nivel1")
 
-
-def _clasificar_rubro() -> pl.Expr:
-    """Mapea el texto libre de `rubronombre` a los rubros del MVP.
-
-    Gana el primer rubro que matchea, así que config.RUBROS va de específico a
-    amplio. Lo que cae en EXCLUSIONES (mayoristas, fábricas, depósitos) sale como
-    "otro" antes de evaluar nada: no son comercios a la calle.
-    """
-    nombre = _normalizado()
-    expr = pl.when(nombre.str.contains(config.EXCLUSIONES)).then(pl.lit("otro"))
-
-    for rubro, reglas in config.RUBROS.items():
-        cond = nombre.str.contains(reglas["incluye"])
-        if excluye := reglas.get("excluye"):
-            cond = cond & ~nombre.str.contains(excluye)
-        expr = expr.when(cond).then(pl.lit(rubro))
-
-    return expr.otherwise(pl.lit("otro")).alias("rubro")
+    unido = df.join(tabla, on="rubronombre", how="left")
+    if huerfanos := unido.filter(pl.col("nivel2").is_null()).height:
+        log.warning(
+            "%s habilitaciones con un rubro que no está en el mapeo (quedan en 'otro'). "
+            "Regenerá el mapeo si el nomenclador cambió.",
+            f"{huerfanos:,}",
+        )
+    return unido.with_columns(
+        pl.col("nivel2").fill_null("otro"), pl.col("nivel1").fill_null("otro")
+    )
 
 
 def ejecutar() -> tuple[pl.DataFrame, pl.DataFrame]:

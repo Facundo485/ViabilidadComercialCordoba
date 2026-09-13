@@ -7,7 +7,7 @@ import logging
 
 import polars as pl
 
-from . import arcgis, config, ingest, manzanas
+from . import arcgis, config, ingest, manzanas, mapeo
 
 
 def _log():
@@ -32,6 +32,11 @@ def cmd_rubros(_) -> None:
     print(f"Escrito en {salida}\n\nLos 15 más frecuentes:")
     with pl.Config(tbl_rows=15, fmt_str_lengths=70):
         print(df.head(15))
+
+
+def cmd_mapeo(_) -> None:
+    """Regenera el mapeo de rubros a partir de las reglas de rubros.py."""
+    mapeo.resumen(mapeo.generar())
 
 
 def cmd_ingest(_) -> None:
@@ -65,6 +70,7 @@ def _resumen(df: pl.DataFrame) -> None:
 
 COMANDOS = {
     "rubros": cmd_rubros,
+    "mapeo": cmd_mapeo,
     "ingest": cmd_ingest,
     "manzanas": cmd_manzanas,
     "todo": cmd_todo,

@@ -28,8 +28,7 @@ def agregar(parcelas: pl.DataFrame, historial: pl.DataFrame) -> pl.DataFrame:
     )
 
     base = base.filter(pl.col("hab_total") > 0)
-    base = _con_tasa_suavizada(base)
-    return base.join(_por_rubro(historial), on="manzana", how="left").sort("manzana")
+    return _con_tasa_suavizada(base).sort("manzana")
 
 
 def _con_tasa_suavizada(df: pl.DataFrame) -> pl.DataFrame:
@@ -51,31 +50,60 @@ def _con_tasa_suavizada(df: pl.DataFrame) -> pl.DataFrame:
     )
 
 
-def _por_rubro(historial: pl.DataFrame) -> pl.DataFrame:
-    """Cuenta habilitaciones y vigentes por manzana y rubro, en columnas anchas."""
-    largo = (
-        historial.filter(pl.col("rubro") != "otro")
-        .group_by("manzana", "rubro")
-        .agg(
-            pl.len().alias("total"),
-            pl.col("vigente").fill_null(0).sum().alias("vigentes"),
-        )
-    )
-    if largo.is_empty():
-        return pl.DataFrame({"manzana": []}, schema={"manzana": pl.Utf8})
+def por_rubro(historial: pl.DataFrame) -> pl.DataFrame:
+    """Tabla larga: una fila por manzana y rubro, con su tasa de supervivencia.
 
-    return largo.pivot(
-        on="rubro", index="manzana", values=["total", "vigentes"], aggregate_function="first"
-    ).fill_null(0)
+    Larga y no ancha a propósito: con 76 categorías de nivel 2 un pivot daría más
+    de 150 columnas, casi todas vacías. El formato largo además es el que espera
+    el modelo, que se ajusta por rubro.
+    """
+    detalle = historial.filter(pl.col("nivel1") != "industria y deposito")
+
+    agregado = detalle.group_by("manzana", "nivel2", "nivel1").agg(
+        pl.len().alias("total"),
+        pl.col("vigente").fill_null(0).sum().alias("vigentes"),
+    )
+    promedios = _promedio_por_rubro(detalle)
+
+    return (
+        agregado.join(promedios, on="nivel2", how="left")
+        .with_columns(
+            (pl.col("vigentes") / pl.col("total")).alias("tasa_cruda"),
+            (
+                (pl.col("vigentes") + M_SUAVIZADO * pl.col("promedio_rubro"))
+                / (pl.col("total") + M_SUAVIZADO)
+            ).alias("tasa_supervivencia"),
+        )
+        .drop("promedio_rubro")
+        .sort("manzana", "nivel2")
+    )
+
+
+def _promedio_por_rubro(detalle: pl.DataFrame) -> pl.DataFrame:
+    """Tasa de supervivencia de cada rubro en toda la ciudad.
+
+    Es el valor hacia el que se suaviza cada manzana. Usar el promedio del rubro
+    y no el global importa: una farmacia y un bar tienen expectativas de vida muy
+    distintas, y comparar cada uno contra su propio rubro es lo que hace que el
+    número signifique algo.
+    """
+    return detalle.group_by("nivel2").agg(
+        (pl.col("vigente").fill_null(0).sum() / pl.len()).alias("promedio_rubro")
+    )
 
 
 def ejecutar() -> pl.DataFrame:
     parcelas = pl.read_parquet(config.DIR_CRUDO / "parcelas.parquet")
     historial = pl.read_parquet(config.DIR_CRUDO / "historial.parquet")
 
-    manzanas = agregar(parcelas, historial)
-
     config.DIR_PROCESADO.mkdir(parents=True, exist_ok=True)
+
+    manzanas = agregar(parcelas, historial)
     manzanas.write_parquet(config.DIR_PROCESADO / "manzanas.parquet")
     log.info("Manzanas: %s filas", f"{len(manzanas):,}")
+
+    detalle = por_rubro(historial)
+    detalle.write_parquet(config.DIR_PROCESADO / "manzana_rubro.parquet")
+    log.info("Manzana x rubro: %s filas", f"{len(detalle):,}")
+
     return manzanas

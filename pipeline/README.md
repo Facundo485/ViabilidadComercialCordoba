@@ -41,7 +41,32 @@ Los datos quedan en `data/crudo/` y `data/procesado/` como parquet (sin versiona
 `rubros` además escribe `referencia/rubros.csv`, que sí se versiona porque es
 el insumo para decidir el mapeo de `config.RUBROS`.
 
-## Pendiente
+## Rubros
 
-`config.RUBROS` mapea texto libre a los 5 rubros del MVP con patrones puestos a
-ojo. Correr `python -m viabilidad rubros` y ajustarlos contra los valores reales.
+`rubronombre` trae 1377 valores: dos nomencladores mezclados (el municipal viejo
+en Título con acentos, el CLANAE nuevo en MAYÚSCULAS) con variantes del mismo
+concepto. Se agrupan en dos niveles, 76 rubros y 12 grupos, que cubren el 93%
+de las habilitaciones.
+
+| archivo | qué es |
+|---|---|
+| `rubros.py` | las reglas que generan el mapeo |
+| `referencia/mapeo_rubros.csv` | **la fuente de verdad**, versionada y editable a mano |
+
+El pipeline lee el CSV, no las reglas: corregir una clasificación es editar una
+fila y el diff muestra qué cambió. `python -m viabilidad mapeo` lo regenera
+desde las reglas (pisa las ediciones manuales).
+
+Los mayoristas, fábricas y depósitos quedan en el grupo `industria y deposito` y
+se excluyen del análisis: no son comercios a la calle.
+
+## Salidas
+
+| archivo | grano |
+|---|---|
+| `data/procesado/manzanas.parquet` | una fila por manzana |
+| `data/procesado/manzana_rubro.parquet` | una fila por manzana y rubro |
+
+La tasa de supervivencia se suaviza hacia el promedio **del propio rubro**, no
+hacia el global: una farmacia y un bar tienen expectativas de vida distintas y
+cada manzana se compara contra su categoría.
