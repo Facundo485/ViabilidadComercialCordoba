@@ -15,12 +15,23 @@ def _log():
 
 
 def cmd_rubros(_) -> None:
-    """Lista los valores reales de `rubronombre` con su cantidad."""
+    """Vuelca los valores reales de `rubronombre` con su cantidad a un CSV.
+
+    El nomenclador municipal tiene cientos de entradas, así que a la terminal
+    solo va un resumen; la lista completa queda en referencia/rubros.csv para
+    poder ajustar config.RUBROS contra ella.
+    """
     filas = arcgis.rubros_con_conteo(config.GIS_BASE, config.TABLA_HISTORIAL)
     df = pl.DataFrame(filas).sort("n", descending=True)
-    with pl.Config(tbl_rows=200, fmt_str_lengths=60):
-        print(df)
-    print(f"\n{len(df)} rubros distintos")
+
+    config.DIR_REFERENCIA.mkdir(parents=True, exist_ok=True)
+    salida = config.DIR_REFERENCIA / "rubros.csv"
+    df.write_csv(salida)
+
+    print(f"\n{len(df):,} rubros distintos, {df['n'].sum():,} habilitaciones en total")
+    print(f"Escrito en {salida}\n\nLos 15 más frecuentes:")
+    with pl.Config(tbl_rows=15, fmt_str_lengths=70):
+        print(df.head(15))
 
 
 def cmd_ingest(_) -> None:

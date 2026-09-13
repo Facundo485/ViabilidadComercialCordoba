@@ -37,7 +37,9 @@ Con [uv](https://docs.astral.sh/uv/) es `uv sync && uv run python -m viabilidad 
 
 Comandos sueltos: `ingest` (solo descarga), `manzanas` (solo agrega).
 
-Los datos quedan en `data/crudo/` y `data/procesado/` como parquet.
+Los datos quedan en `data/crudo/` y `data/procesado/` como parquet (sin versionar).
+`rubros` además escribe `referencia/rubros.csv`, que sí se versiona porque es
+el insumo para decidir el mapeo de `config.RUBROS`.
 
 ## Pendiente
 
