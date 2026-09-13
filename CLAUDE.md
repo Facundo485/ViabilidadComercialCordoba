@@ -285,6 +285,12 @@ Hallazgos que condicionan el modelado:
 - **La manzana no necesita join espacial.** Está embebida en `nro_catastral`:
   `01-01-001-007` → manzana `01-01-001` (distrito-zona-manzana-parcela).
 
-**Fase 2 en curso:** ingeniería de variables. Arrancando por las que se calculan
-sobre los datos ya descargados (competencia por radio, entropía de Shannon,
-densidad, entorno vecino) antes de sumar fuentes externas.
+**Bloqueante abierto antes de la Fase 2:** la tasa `vigentes/total` mide
+antigüedad, no supervivencia. Los permisos duran ~5 años, así que una
+habilitación reciente figura vigente por construcción; y como los dos
+nomencladores se usaron en épocas distintas, el rubro queda correlacionado con
+el año. Resultado: gastronomía da 95,6% de supervivencia y regalería 0%.
+
+Hay que reemplazar la tasa por análisis de supervivencia con `lifelines` antes
+de construir features sobre un objetivo que mide otra cosa. El detalle, el
+diagnóstico y los pasos están en **`docs/proximo-paso.md`**.
