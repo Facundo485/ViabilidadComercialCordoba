@@ -35,7 +35,11 @@ además `python` apunta a `python3`, así que los comandos andan tal cual.
 
 Con [uv](https://docs.astral.sh/uv/) es `uv sync && uv run python -m viabilidad rubros`.
 
-Comandos sueltos: `ingest` (solo descarga), `manzanas` (solo agrega).
+Comandos sueltos: `ingest` (solo descarga), `manzanas` (solo agrega),
+`resumen` (escribe los CSV agregados).
+
+`todo` ya corre `resumen` al final. Los CSV que deja son agregados, sin CUIT ni
+razón social, así que se pueden commitear sin exponer datos de titulares.
 
 ## Tests
 

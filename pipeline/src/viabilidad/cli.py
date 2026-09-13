@@ -7,7 +7,7 @@ import logging
 
 import polars as pl
 
-from . import arcgis, config, ingest, manzanas, mapeo
+from . import arcgis, config, ingest, manzanas, mapeo, resumen
 
 
 def _log():
@@ -48,9 +48,15 @@ def cmd_manzanas(_) -> None:
     _resumen(df)
 
 
+def cmd_resumen(_) -> None:
+    """Escribe los CSV agregados para revisar o commitear."""
+    resumen.generar()
+
+
 def cmd_todo(args) -> None:
     ingest.ejecutar()
     _resumen(manzanas.ejecutar())
+    resumen.generar()
 
 
 def _resumen(df: pl.DataFrame) -> None:
@@ -73,6 +79,7 @@ COMANDOS = {
     "mapeo": cmd_mapeo,
     "ingest": cmd_ingest,
     "manzanas": cmd_manzanas,
+    "resumen": cmd_resumen,
     "todo": cmd_todo,
 }
 
