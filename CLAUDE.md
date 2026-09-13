@@ -226,6 +226,7 @@ React/
     │   ├── ingest.py          # descarga y limpia
     │   ├── manzanas.py        # agrega a manzana y calcula supervivencia
     │   ├── resumen.py         # CSV agregados para revisar o commitear
+    │   ├── diagnostico.py     # chequea que la tasa no mida antigüedad
     │   └── cli.py
     └── tests/
 ```
@@ -239,7 +240,7 @@ resto del proyecto. Cuando aparezcan las features y el modelo van como
 `pipeline/` queda como un proyecto Python instalable aparte, para que el backend
 y el frontend puedan sumarse como carpetas hermanas sin mezclarse.
 
-Comandos: `python -m viabilidad {rubros|mapeo|ingest|manzanas|resumen|todo}`.
+Comandos: `python -m viabilidad {rubros|mapeo|ingest|manzanas|resumen|diagnostico|todo}`.
 
 ## Convenciones
 
@@ -290,6 +291,14 @@ antigüedad, no supervivencia. Los permisos duran ~5 años, así que una
 habilitación reciente figura vigente por construcción; y como los dos
 nomencladores se usaron en épocas distintas, el rubro queda correlacionado con
 el año. Resultado: gastronomía da 95,6% de supervivencia y regalería 0%.
+
+**Medido, ya no es sospecha.** `python -m viabilidad diagnostico` cruza la tasa
+de cada rubro contra la proporción de sus habilitaciones cargadas bajo el
+nomenclador nuevo: Pearson 0,716 sobre 65 rubros, y en 48 de ellos la tasa no
+se parece a esa proporción, *es* esa proporción. Un modelo de dos parámetros
+—el nomenclador viejo no sobrevive nunca, el nuevo sobrevive ~0,66 sin importar
+el rubro— explica el 87% de la varianza entre rubros. La tabla de supervivencia
+por rubro no contiene información sobre los rubros.
 
 Hay que reemplazar la tasa por análisis de supervivencia con `lifelines` antes
 de construir features sobre un objetivo que mide otra cosa. El detalle, el

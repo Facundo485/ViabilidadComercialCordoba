@@ -1,6 +1,8 @@
 # Próximo paso — la tasa de supervivencia está confundida con la antigüedad
 
-**Estado:** bloqueante abierto. No construir features hasta resolverlo.
+**Estado:** Paso 1 hecho, hipótesis confirmada. El bloqueante sigue abierto: la
+tasa cruda no se puede usar y todavía no está el análisis de supervivencia que
+la reemplaza (Paso 2). No construir features hasta resolverlo.
 **Contexto general:** `CLAUDE.md`. **Plan por fases:** `docs/roadmap.md`.
 
 ---
@@ -53,30 +55,77 @@ tuvo oportunidad de vencer: es censura a derecha, no éxito."*
 
 ---
 
-## Paso 1 — confirmar la hipótesis
+## Paso 1 — confirmar la hipótesis (hecho: confirmada)
 
 ```bash
 cd pipeline && source .venv/bin/activate
-python -c "
-import polars as pl
-h = pl.read_parquet('data/crudo/historial.parquet')
-r = (h.filter(pl.col('nivel2')!='otro')
-      .group_by('nivel2')
-      .agg(pl.len().alias('n'),
-           pl.col('fechahabaprobada').dt.year().median().alias('anio_mediano'),
-           pl.col('vigente').mean().round(3).alias('tasa'))
-      .filter(pl.col('n')>=300).sort('tasa', descending=True))
-print(r)
-print('correlacion anio_mediano vs tasa:',
-      round(r.select(pl.corr('anio_mediano','tasa')).item(), 3))
-"
+python -m viabilidad diagnostico
 ```
 
-Una correlación alta (> 0,7) confirma que la tasa cruda mide antigüedad y no
-sirve para comparar rubros entre sí.
+El chequeo quedó como módulo (`pipeline/src/viabilidad/diagnostico.py`) en vez
+de un `python -c` suelto: es el tipo de comprobación que hay que repetir cada
+vez que se toca el mapeo de rubros o la derivación de la vigencia.
 
-Vale la pena mirar también si el nomenclador viejo y el nuevo se reparten por
-época, cruzando `rubronombre` (si está en MAYÚSCULAS o no) contra el año.
+Corre por dos vías independientes. La del **nomenclador** usa solo tablas
+versionadas (`referencia/mapeo_rubros.csv` y `resumen_rubros.csv`), así que no
+necesita red ni haber descargado el GIS. La del **año** necesita
+`data/crudo/historial.parquet` y se omite sola, con un aviso, si no está.
+
+### Resultado
+
+Confirmada, y por un margen mayor al esperado. Sobre los 65 rubros de nivel 2
+con 300 habilitaciones o más:
+
+| | |
+|---|---|
+| Correlación `frac_nuevo` vs `tasa` | **Pearson 0,716 · Spearman 0,758** |
+| Rubros con \|tasa − frac_nuevo\| < 0,10 | **48 de 65** |
+| Ajuste `tasa = p · frac_nuevo` | p = 0,664, **R² = 0,869** |
+
+`frac_nuevo` es la proporción de habilitaciones del rubro cargadas bajo el
+nomenclador CLANAE/CIIU (MAYÚSCULAS). La correlación supera el umbral de 0,7
+que fijaba este documento, pero el hallazgo fuerte es otro: **para dos tercios
+de los rubros la tasa no se parece a `frac_nuevo`, es `frac_nuevo`.**
+
+| nivel2 | habilitaciones | tasa | frac_nuevo |
+|---|---|---|---|
+| `bar_restaurante` | 1.781 | 95,6% | 98,9% |
+| `electrodomesticos` | 352 | 83,2% | 100% |
+| `transporte` | 947 | 15,6% | 15,7% |
+| `belleza` | 520 | 5,8% | 6,0% |
+| `locutorio` | 360 | 3,1% | 3,6% |
+| `cafeteria` | 324 | 2,5% | 2,5% |
+| `regaleria` | 1.527 | 0,0% | 0,0% |
+| `intermediarios` | 479 | 0,0% | 0,0% |
+
+El ajuste por el origen dice qué está pasando, y es un modelo falsable: una
+habilitación del nomenclador viejo **no sobrevive nunca** (tasa 0 en los dos
+rubros que son 100% viejos), y una del nuevo sobrevive con probabilidad ~0,66
+**sin importar el rubro**. Con esos dos números y nada más se explica el 87% de
+la varianza entre rubros. Es decir: la tabla de supervivencia por rubro no
+contiene información sobre los rubros.
+
+Eso también responde el misterio de `bar_restaurante` (95,6%) contra
+`cafeteria` (2,5%), que son el mismo negocio: uno matchea nombres nuevos y el
+otro nombres viejos. No son dos mercados distintos, son dos épocas de carga.
+
+Los 17 rubros que se apartan del patrón son los que tienen algo que decir
+—`forrajeria` (100% nuevo, tasa 22,7%), `oficina`, `peluqueria`,
+`taller_mecanico`, `heladeria`—, y son justamente los que la tasa cruda
+ordena mal.
+
+### Lo que queda pendiente de este paso
+
+El cruce contra el **año mediano** de habilitación no se pudo correr: el
+entorno de esta sesión tiene bloqueado `gis.cordoba.gob.ar` por política de
+egress (403 al CONNECT del proxy), así que no hay forma de regenerar
+`data/crudo/historial.parquet`, que está gitignoreado. El código está escrito y
+cubierto por tests; corre solo con hacer `python -m viabilidad ingest` desde una
+red que llegue al GIS.
+
+No es un bloqueante para el Paso 2. La vía del nomenclador ya confirma que la
+tasa no sirve para comparar rubros, y el nomenclador es un marcador de época:
+el cruce contra el año mediría lo mismo con otro reloj.
 
 ## Paso 2 — reemplazar la tasa por análisis de supervivencia
 

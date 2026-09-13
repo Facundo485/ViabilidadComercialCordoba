@@ -7,7 +7,7 @@ import logging
 
 import polars as pl
 
-from . import arcgis, config, ingest, manzanas, mapeo, resumen
+from . import arcgis, config, diagnostico, ingest, manzanas, mapeo, resumen
 
 
 def _log():
@@ -53,6 +53,11 @@ def cmd_resumen(_) -> None:
     resumen.generar()
 
 
+def cmd_diagnostico(_) -> None:
+    """Chequea si la tasa de vigentes mide supervivencia o antigüedad."""
+    diagnostico.ejecutar()
+
+
 def cmd_todo(args) -> None:
     ingest.ejecutar()
     _resumen(manzanas.ejecutar())
@@ -78,6 +83,7 @@ COMANDOS = {
     "ingest": cmd_ingest,
     "manzanas": cmd_manzanas,
     "resumen": cmd_resumen,
+    "diagnostico": cmd_diagnostico,
     "todo": cmd_todo,
 }
 
