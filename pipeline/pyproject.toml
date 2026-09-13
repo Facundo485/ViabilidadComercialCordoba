@@ -6,7 +6,6 @@ requires-python = ">=3.11"
 dependencies = [
     "polars>=1.0",
     "requests>=2.31",
-    "pyarrow>=15.0",
 ]
 
 [build-system]

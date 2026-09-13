@@ -21,11 +21,19 @@ La manzana no requiere join espacial: está embebida en `nro_catastral`
 
 ```bash
 cd pipeline
-uv sync                       # o: pip install -e .
+python3 -m venv .venv
+source .venv/bin/activate     # Windows: .venv\Scripts\activate
+pip install -e .
 
-python -m viabilidad rubros     # lista los rubros reales del GIS, con conteos
-python -m viabilidad todo       # descarga, agrega y muestra el resumen
+python -m viabilidad rubros   # lista los rubros reales del GIS, con conteos
+python -m viabilidad todo     # descarga, agrega y muestra el resumen
 ```
+
+El venv no es opcional en Debian/Ubuntu: desde PEP 668 `pip install` contra el
+Python del sistema falla con `externally-managed-environment`. Adentro del venv
+además `python` apunta a `python3`, así que los comandos andan tal cual.
+
+Con [uv](https://docs.astral.sh/uv/) es `uv sync && uv run python -m viabilidad rubros`.
 
 Comandos sueltos: `ingest` (solo descarga), `manzanas` (solo agrega).
 
