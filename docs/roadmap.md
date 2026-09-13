@@ -48,7 +48,7 @@ Plataforma que asigna un **score de viabilidad comercial** a cualquier ubicació
 - [x] Configurar entorno: Python 3.11+, `venv`
 - [x] Instalar stack base (`polars` en vez de `pandas`; ver `CLAUDE.md`)
 - [x] Estructura de tests
-- [ ] Configurar `pre-commit` y linting (`ruff`)
+- [x] Configurar `pre-commit` y linting (`ruff`)
 - [x] Crear README con planteo del problema y objetivos
 
 ### Estructura sugerida del repositorio

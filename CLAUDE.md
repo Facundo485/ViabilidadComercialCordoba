@@ -245,7 +245,8 @@ Comandos: `python -m viabilidad {rubros|mapeo|ingest|manzanas|resumen|todo}`.
 
 - **Toda ingesta debe ser un script reproducible.** Nada de descargas manuales: el pipeline tiene que poder correr de cero.
 - **No versionar `data/raw/`.** Los scripts regeneran las descargas.
-- Linting con `ruff`, `pre-commit` configurado. **Pendiente.**
+- Linting y formato con `ruff`; `pre-commit` corre ruff, chequeos de archivos y
+  los tests en cada commit. Instalarlo una vez: `pre-commit install`.
 - Tests para las transformaciones de datos, no solo para el modelo.
 - **Los tests ejercitan las funciones de ingesta enteras, con el GIS mockeado,
   no sus helpers sueltos.** Un test por helper prueba que la pieza anda, no que

@@ -87,9 +87,7 @@ def _promedio_por_rubro(detalle: pl.DataFrame) -> pl.DataFrame:
     distintas, y comparar cada uno contra su propio rubro es lo que hace que el
     número signifique algo.
     """
-    return detalle.group_by("nivel2").agg(
-        pl.col("vigente").mean().alias("promedio_rubro")
-    )
+    return detalle.group_by("nivel2").agg(pl.col("vigente").mean().alias("promedio_rubro"))
 
 
 def ejecutar() -> pl.DataFrame:

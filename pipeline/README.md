@@ -48,6 +48,12 @@ pip install -e '.[dev]'
 pytest
 ```
 
+Y una sola vez, desde la raíz del repo, para que corran solos en cada commit:
+
+```bash
+pre-commit install
+```
+
 Mockean el GIS y ejercitan las funciones `descargar_*` enteras, no sus helpers
 sueltos: así se detecta que un paso quedó sin ejecutarse, que es justo lo que un
 test por helper no ve.

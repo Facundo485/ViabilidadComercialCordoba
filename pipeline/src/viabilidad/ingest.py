@@ -17,9 +17,7 @@ FECHAS_HISTORIAL = ["fechahabaprobada", "fechavencimientohab"]
 
 def _a_fecha(df: pl.DataFrame, columnas: list[str]) -> pl.DataFrame:
     presentes = [c for c in columnas if c in df.columns]
-    return df.with_columns(
-        pl.from_epoch(pl.col(c), time_unit="ms").alias(c) for c in presentes
-    )
+    return df.with_columns(pl.from_epoch(pl.col(c), time_unit="ms").alias(c) for c in presentes)
 
 
 def descargar_parcelas() -> pl.DataFrame:
@@ -108,9 +106,7 @@ def _con_rubro(df: pl.DataFrame) -> pl.DataFrame:
     """
     ruta = config.DIR_REFERENCIA / mapeo.ARCHIVO
     if not ruta.exists():
-        raise FileNotFoundError(
-            f"Falta {ruta}. Corré `python -m viabilidad mapeo` para generarlo."
-        )
+        raise FileNotFoundError(f"Falta {ruta}. Corré `python -m viabilidad mapeo` para generarlo.")
     # Se une por el nombre normalizado y no por el crudo: el nomenclador tiene
     # entradas que solo difieren en un espacio doble, y un join exacto las perdería.
     tabla = (
@@ -120,9 +116,7 @@ def _con_rubro(df: pl.DataFrame) -> pl.DataFrame:
         .unique(subset="_clave", keep="first")
     )
 
-    unido = df.with_columns(mapeo.normalizar().alias("_clave")).join(
-        tabla, on="_clave", how="left"
-    )
+    unido = df.with_columns(mapeo.normalizar().alias("_clave")).join(tabla, on="_clave", how="left")
     if huerfanos := unido.filter(pl.col("nivel2").is_null()).height:
         log.warning(
             "%s habilitaciones con un rubro que no está en el mapeo (quedan en 'otro'). "

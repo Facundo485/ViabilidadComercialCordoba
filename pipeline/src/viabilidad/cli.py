@@ -61,9 +61,7 @@ def cmd_todo(args) -> None:
 
 def _resumen(df: pl.DataFrame) -> None:
     print(f"\n{'=' * 60}\n  {len(df):,} manzanas con al menos una habilitación\n{'=' * 60}")
-    print(
-        df.select("hab_total", "hab_vigentes", "tasa_cruda", "tasa_supervivencia").describe()
-    )
+    print(df.select("hab_total", "hab_vigentes", "tasa_cruda", "tasa_supervivencia").describe())
     print("\nLas 10 manzanas con mejor supervivencia (mínimo 20 habilitaciones):")
     with pl.Config(tbl_rows=10):
         print(

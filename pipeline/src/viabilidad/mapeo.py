@@ -41,9 +41,7 @@ def generar() -> pl.DataFrame:
     df = pl.read_csv(origen).sort("n", descending=True)
 
     df = df.with_columns(clasificar(normalizar()).alias("nivel2")).with_columns(
-        pl.col("nivel2")
-        .replace_strict(rubros.NIVEL1_DE, default="otro")
-        .alias("nivel1")
+        pl.col("nivel2").replace_strict(rubros.NIVEL1_DE, default="otro").alias("nivel1")
     )
 
     salida = config.DIR_REFERENCIA / ARCHIVO
@@ -56,8 +54,10 @@ def resumen(df: pl.DataFrame) -> None:
     total = df["n"].sum()
     sin_clasificar = df.filter(pl.col("nivel2") == "otro")["n"].sum()
 
-    print(f"\n{len(df):,} rubros -> {df['nivel2'].n_unique()} de nivel 2, "
-          f"{df['nivel1'].n_unique()} de nivel 1")
+    print(
+        f"\n{len(df):,} rubros -> {df['nivel2'].n_unique()} de nivel 2, "
+        f"{df['nivel1'].n_unique()} de nivel 1"
+    )
     print(f"Clasificado: {1 - sin_clasificar / total:.1%} de las {total:,} habilitaciones\n")
 
     por_n1 = (
@@ -71,11 +71,11 @@ def resumen(df: pl.DataFrame) -> None:
     # Umbral para modelar: ~200 habilitaciones dan ~100 cierres, que es el mínimo
     # razonable para estimar un modelo con del orden de 10 variables.
     por_n2 = df.group_by("nivel2", "nivel1").agg(pl.col("n").sum().alias("habilitaciones"))
-    modelables = por_n2.filter(
-        (pl.col("habilitaciones") >= 200) & (pl.col("nivel2") != "otro")
+    modelables = por_n2.filter((pl.col("habilitaciones") >= 200) & (pl.col("nivel2") != "otro"))
+    print(
+        f"\nCategorías de nivel 2 con >=200 habilitaciones: {len(modelables)} "
+        f"de {por_n2['nivel2'].n_unique() - 1}"
     )
-    print(f"\nCategorías de nivel 2 con >=200 habilitaciones: {len(modelables)} "
-          f"de {por_n2['nivel2'].n_unique() - 1}")
 
     print("\nLo que quedó sin clasificar, por volumen:")
     with pl.Config(tbl_rows=12, fmt_str_lengths=78, tbl_hide_dataframe_shape=True):

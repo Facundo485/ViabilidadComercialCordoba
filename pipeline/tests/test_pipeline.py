@@ -41,20 +41,30 @@ def datos():
             nro = f"01-01-{mz:03d}-{p:03d}"
             total = random.randint(1, 5)
             vig = random.randint(0, total)
-            parcelas.append({
-                "objectid": len(parcelas) + 1, "nro_catastral": nro,
-                "hab_total": total, "hab_vigentes": vig, "hab_novigentes": total - vig,
-                "lon": -64.17 + random.random() / 100, "lat": -31.37 - random.random() / 100,
-                "barrio_identificado": "AYACUCHO", "cpc_identificado": "CENTRO AMERICA",
-            })
+            parcelas.append(
+                {
+                    "objectid": len(parcelas) + 1,
+                    "nro_catastral": nro,
+                    "hab_total": total,
+                    "hab_vigentes": vig,
+                    "hab_novigentes": total - vig,
+                    "lon": -64.17 + random.random() / 100,
+                    "lat": -31.37 - random.random() / 100,
+                    "barrio_identificado": "AYACUCHO",
+                    "cpc_identificado": "CENTRO AMERICA",
+                }
+            )
             for _ in range(total):
-                historial.append({
-                    "objectid": len(historial) + 1, "nro_catastral": nro,
-                    "rubronombre": random.choice(RUBROS_REALES),
-                    "vigente": random.randint(0, 1),
-                    "fechahabaprobada": 1_600_000_000_000,
-                    "fechavencimientohab": 1_700_000_000_000,
-                })
+                historial.append(
+                    {
+                        "objectid": len(historial) + 1,
+                        "nro_catastral": nro,
+                        "rubronombre": random.choice(RUBROS_REALES),
+                        "vigente": random.randint(0, 1),
+                        "fechahabaprobada": 1_600_000_000_000,
+                        "fechavencimientohab": 1_700_000_000_000,
+                    }
+                )
     return parcelas, historial
 
 

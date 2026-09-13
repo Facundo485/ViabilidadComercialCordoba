@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Any, Iterator
+from collections.abc import Iterator
+from typing import Any
 
 import requests
 
@@ -26,7 +27,7 @@ def _get(url: str, params: dict[str, Any]) -> dict[str, Any]:
             if "error" in datos:
                 raise RuntimeError(f"ArcGIS respondió error: {datos['error']}")
             return datos
-        except Exception as exc:  # noqa: BLE001 - reintentamos cualquier fallo de red
+        except Exception as exc:
             ultimo_error = exc
             espera = 2 ** (intento + 1)
             log.warning("Fallo la consulta (%s). Reintento en %ss", exc, espera)
