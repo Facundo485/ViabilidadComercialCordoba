@@ -1,74 +1,74 @@
-nivel2,nivel1,habilitaciones,vigentes,manzanas,tasa
-otro,otro,9623,3725,3068,0.387
-kiosco,comercio general,7090,1915,2890,0.27
-almacen,alimentos,6467,584,3157,0.09
-bebidas,alimentos,6432,2077,2097,0.323
-ropa,indumentaria,6319,1931,1357,0.306
-panaderia,gastronomia,6167,1074,1932,0.174
-dietetica,alimentos,5051,3111,2253,0.616
-comida_para_llevar,gastronomia,4950,2156,2111,0.436
-juegos_azar,esparcimiento,4181,447,1012,0.107
-comercio_otros,comercio general,3498,1019,1749,0.291
-oficina,servicios profesionales,3172,943,1412,0.297
+nivel2,nivel1,tramites,vigentes,manzanas,tasa
+otro,otro,8273,3116,3068,0.377
+kiosco,comercio general,7037,1915,2890,0.272
+almacen,alimentos,6452,584,3157,0.091
+ropa,indumentaria,6182,1894,1357,0.306
+panaderia,gastronomia,5232,1045,1932,0.2
+bebidas,alimentos,4960,2035,2097,0.41
+comida_para_llevar,gastronomia,4891,2149,2111,0.439
+dietetica,alimentos,4756,3051,2253,0.642
+comercio_otros,comercio general,3472,1019,1749,0.293
+oficina,servicios profesionales,3112,939,1412,0.302
 perfumeria,salud,3025,1008,1420,0.333
-carniceria,alimentos,2962,919,1516,0.31
 verduleria,alimentos,2922,883,1726,0.302
-polleria,alimentos,2906,1287,1600,0.443
-calzado,indumentaria,2740,881,587,0.322
-repuestos,automotor,2694,772,1118,0.287
-bijouterie,indumentaria,2550,694,733,0.272
-tecnologia,comercio general,2252,903,644,0.401
-libreria,comercio general,2229,665,1227,0.298
-marroquineria,indumentaria,2176,613,523,0.282
+carniceria,alimentos,2884,919,1516,0.319
+polleria,alimentos,2864,1247,1600,0.435
+calzado,indumentaria,2583,751,587,0.291
+repuestos,automotor,2450,681,1118,0.278
+bijouterie,indumentaria,2328,623,733,0.268
+libreria,comercio general,2200,637,1227,0.29
+marroquineria,indumentaria,2147,592,523,0.276
 peluqueria,servicios personales,2099,538,1096,0.256
-forrajeria,alimentos,2004,455,965,0.227
-limpieza,hogar y construccion,1928,530,1273,0.275
-bar_restaurante,gastronomia,1781,1702,859,0.956
-jugueteria,esparcimiento,1725,548,833,0.318
-regaleria,comercio general,1527,0,896,0.0
-muebleria,hogar y construccion,1462,479,576,0.328
-inmobiliaria,servicios profesionales,1435,432,699,0.301
-consultorio,salud,1381,610,740,0.442
-heladeria,gastronomia,1366,465,701,0.34
-ropa_infantil,indumentaria,1317,329,588,0.25
-fotocopias,servicios personales,1264,253,733,0.2
+limpieza,hogar y construccion,1927,529,1273,0.275
+tecnologia,comercio general,1786,666,644,0.373
+juegos_azar,esparcimiento,1727,432,1012,0.25
+jugueteria,esparcimiento,1657,548,833,0.331
+bar_restaurante,gastronomia,1632,1564,859,0.958
+forrajeria,alimentos,1502,452,965,0.301
+regaleria,comercio general,1499,0,896,0.0
+inmobiliaria,servicios profesionales,1371,399,699,0.291
+consultorio,salud,1334,598,740,0.448
+heladeria,gastronomia,1327,463,701,0.349
+ropa_infantil,indumentaria,1270,327,588,0.257
+fotocopias,servicios personales,1257,253,733,0.201
 fiambreria,alimentos,1243,550,821,0.442
 farmacia,salud,1234,351,771,0.284
-alimentos_otros,alimentos,1192,683,830,0.573
-merceria,indumentaria,1137,237,631,0.208
-lacteos,alimentos,1137,405,720,0.356
-cobranzas,servicios profesionales,1051,205,511,0.195
-lenceria,indumentaria,1015,395,436,0.389
-turismo,servicios profesionales,990,248,434,0.251
+muebleria,hogar y construccion,1220,395,576,0.324
+alimentos_otros,alimentos,1191,683,830,0.573
+lacteos,alimentos,1100,405,720,0.368
+merceria,indumentaria,1090,230,631,0.211
+cobranzas,servicios profesionales,1043,205,511,0.197
+lenceria,indumentaria,1013,395,436,0.39
 ferreteria,hogar y construccion,951,292,645,0.307
-transporte,servicios profesionales,947,148,617,0.156
+turismo,servicios profesionales,946,239,434,0.253
+transporte,servicios profesionales,893,124,617,0.139
 bazar,hogar y construccion,881,357,475,0.405
 indumentaria_deportiva,indumentaria,836,317,360,0.379
 golosinas,alimentos,822,402,464,0.489
-articulos_hogar,hogar y construccion,800,253,414,0.316
-taller_mecanico,automotor,785,129,486,0.164
-optica,salud,617,280,276,0.454
+articulos_hogar,hogar y construccion,778,246,414,0.316
+taller_mecanico,automotor,729,129,486,0.177
+optica,salud,616,280,276,0.455
 gimnasio,servicios personales,593,226,421,0.381
-reparaciones,servicios personales,564,68,383,0.121
-venta_vehiculos,automotor,538,292,349,0.543
-construccion,hogar y construccion,533,173,305,0.325
-educacion,educacion,523,291,372,0.556
-belleza,servicios personales,520,30,299,0.058
+reparaciones,servicios personales,563,68,383,0.121
+construccion,hogar y construccion,496,172,305,0.347
+educacion,educacion,494,271,372,0.549
 pinturería,hogar y construccion,484,151,322,0.312
 tabaqueria,comercio general,482,198,301,0.411
 intermediarios,servicios profesionales,479,0,311,0.0
-vivero,hogar y construccion,475,174,299,0.366
-seguros,servicios profesionales,450,121,278,0.269
-usados,comercio general,422,232,244,0.55
-pescaderia,alimentos,416,176,284,0.423
+venta_vehiculos,automotor,459,249,349,0.542
+vivero,hogar y construccion,438,169,299,0.386
+seguros,servicios profesionales,432,109,278,0.252
+pescaderia,alimentos,415,175,284,0.422
+belleza,servicios personales,414,30,299,0.072
+usados,comercio general,395,209,244,0.529
 locutorio,servicios personales,360,11,269,0.031
-estacion_servicio,automotor,358,58,217,0.162
 electrodomesticos,hogar y construccion,352,293,203,0.832
-cafeteria,gastronomia,324,8,241,0.025
+estacion_servicio,automotor,347,58,217,0.167
+cafeteria,gastronomia,314,8,241,0.025
 ortopedia,salud,263,172,195,0.654
 veterinaria,salud,235,214,217,0.911
 espectaculos,esparcimiento,207,174,177,0.841
-deportes,esparcimiento,203,105,127,0.517
-fotografia,comercio general,183,22,111,0.12
+deportes,esparcimiento,196,103,127,0.526
+fotografia,comercio general,172,22,111,0.128
 laboratorio_analisis,salud,42,23,36,0.548
-lavanderia,servicios personales,40,10,35,0.25
+lavanderia,servicios personales,39,10,35,0.256

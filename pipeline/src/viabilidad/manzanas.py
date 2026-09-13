@@ -57,7 +57,7 @@ def por_rubro(historial: pl.DataFrame) -> pl.DataFrame:
     de 150 columnas, casi todas vacías. El formato largo además es el que espera
     el modelo, que se ajusta por rubro.
     """
-    detalle = historial.filter(pl.col("nivel1") != "industria y deposito")
+    detalle = _un_tramite_por_rubro(historial.filter(pl.col("nivel1") != "industria y deposito"))
 
     agregado = detalle.group_by("manzana", "nivel2", "nivel1").agg(
         pl.col("vigente").count().alias("total"),
@@ -77,6 +77,22 @@ def por_rubro(historial: pl.DataFrame) -> pl.DataFrame:
         .drop("promedio_rubro")
         .sort("manzana", "nivel2")
     )
+
+
+def _un_tramite_por_rubro(historial: pl.DataFrame) -> pl.DataFrame:
+    """Deduplica: un trámite cuenta una vez por rubro, no una vez por fila.
+
+    El histórico trae una fila por trámite y `rubronombre`, y el nomenclador
+    tiene varias entradas que caen en el mismo nivel2 (el municipal viejo y el
+    CLANAE nuevo describen lo mismo). Sin deduplicar, esos trámites se cuentan
+    dos veces dentro del mismo rubro.
+
+    Lo que sí se mantiene es que un trámite habilitado en rubros distintos
+    cuente en cada uno: ahí no hay duplicación, el local está en los dos.
+    """
+    if "id_tramite" not in historial.columns:
+        return historial
+    return historial.unique(subset=["id_tramite", "nivel2"], keep="first")
 
 
 def _promedio_por_rubro(detalle: pl.DataFrame) -> pl.DataFrame:

@@ -1,9 +1,9 @@
 # Próximo paso — la tasa de supervivencia está confundida con la antigüedad
 
-**Estado:** Pasos 1 y 2 hechos. La hipótesis quedó confirmada y el análisis de
-supervivencia está implementado y testeado, pero **todavía no corrió sobre los
-datos reales**: falta validarlo con el histórico descargado (ver "Estado" en el
-Paso 2). No construir features hasta ver esa salida.
+**Estado:** Paso 1 cerrado. Paso 2 corrido sobre datos reales y **a medias**: la
+consolidación de renovaciones ya funciona y el chequeo de dominio da OK, pero la
+época sigue explicando buena parte de la tabla por rubro (ver "Paso 2b"). No
+construir features hasta cerrar eso.
 **Contexto general:** `CLAUDE.md`. **Plan por fases:** `docs/roadmap.md`.
 
 ---
@@ -128,7 +128,7 @@ No es un bloqueante para el Paso 2. La vía del nomenclador ya confirma que la
 tasa no sirve para comparar rubros, y el nomenclador es un marcador de época:
 el cruce contra el año mediría lo mismo con otro reloj.
 
-## Paso 2 — reemplazar la tasa por análisis de supervivencia (implementado)
+## Paso 2 — reemplazar la tasa por análisis de supervivencia (corrido, a medias)
 
 ```bash
 cd pipeline && source .venv/bin/activate
@@ -161,8 +161,8 @@ siempre— sino **si lo renovó**. Así que la unidad de análisis no es la
 habilitación sino el **período de actividad** de un titular en una dirección,
 que puede encadenar varias:
 
-    spell  = habilitaciones sucesivas de (cuitempresa, nro_catastral) sin un
-             hueco mayor a un año entre el vencimiento de una y el alta de la
+    spell  = trámites sucesivos de (titular, nro_catastral) sin un hueco
+             mayor a un año entre el vencimiento de uno y el alta del
              siguiente
     cierre = la cobertura caducó y nadie renovó
     censura = todavía tiene permiso vigente
@@ -191,30 +191,98 @@ Dos cuidados que no estaban en el plan y que el código aplica:
 - **Huecos.** Un titular que se va y vuelve tres años después no renovó: son dos
   comercios. Un hueco mayor a un año abre un período nuevo.
 
-### Estado
+### Estado — corrido sobre datos reales el 13/09
 
-Implementado y cubierto por 7 tests, **pero sin correr sobre los datos reales**:
-en esta sesión `gis.cordoba.gob.ar` está bloqueado por política de egress, así
-que no hay `data/crudo/historial.parquet`.
+La primera corrida real dio **cero renovaciones**, exactamente cero:
 
-Los tests corren sobre datos sintéticos que imitan la estructura real (plazos de
-5 años fijos, renovaciones como filas nuevas). Uno de ellos,
-`test_sin_consolidar_los_dos_rubros_se_ven_iguales`, es el que fija la
-corrección: construye dos rubros con vidas de 20 y 5 años y verifica que, medidos
-habilitación por habilitación, den la misma mediana. Si alguien saca la
-consolidación, ese test falla.
+```
+144.743 habilitaciones -> 144.743 períodos de actividad (0 con al menos una renovación).
+```
 
-**Lo que hay que mirar al correrlo con datos reales**, en este orden:
+No era que el municipio no registrara las renovaciones. Era que la clave de
+consolidación, `cuitempresa`, **viene nula en el 100% de las filas** del
+histórico, igual que `vigente`. El schema la declara y nadie la popula. Como las
+filas sin CUIT quedan cada una como su propio spell, el resultado no podía ser
+otro. Verificado contra el GIS en vivo, no solo contra el parquet.
 
-1. `plazos()`: si el desvío es chico, el diagnóstico de arriba queda confirmado
-   sobre los datos y no solo sobre los sintéticos. Si el plazo resulta variar
-   mucho por rubro, hay que revisar esta lógica, no aplicarla de taquito.
-2. Cuántos períodos quedan con al menos una renovación. Si son casi cero, el
-   supuesto de que las renovaciones se cargan como altas nuevas es falso y hay
-   que averiguar cómo se registra realmente una renovación antes de seguir.
-3. El chequeo de dominio: gastronomía tiene que quedar **por debajo** de
-   farmacia. El módulo lo imprime y lo marca. Si da al revés o empatado, el
-   objetivo sigue midiendo otra cosa y el Paso 3 sigue bloqueado.
+**El destrabe.** Otro servicio del mismo GIS sí la trae poblada:
+
+```
+ComerdioIndustria/Habilitaciones_Comerciales_Vista/FeatureServer/0
+```
+
+71.287 filas, cero nulos en `cuitempresa`, 46.767 titulares distintos, y su
+campo `id` matchea `id_tramite` del histórico en los 71.287. `ingest` la baja,
+hashea el CUIT (blake2b con sal, ver `config.SAL_CUIT`) y lo adjunta como
+`titular`. El número no queda escrito en claro en ningún parquet y
+`razonsocial` ni se descarga. Es seudonimización, no anonimización: el espacio
+de CUITs es chico y un hash con sal conocida se invierte por fuerza bruta. La
+protección real sigue siendo que `data/` no se versiona.
+
+**El error de conteo que apareció de paso.** Las 144.743 filas del histórico no
+son 144.743 habilitaciones: son **71.287 trámites**. Un trámite habilita varios
+rubros a la vez (media 2,03, máximo 73) y aparece una vez por cada uno. Todos
+los conteos anteriores estaban inflados al doble. La unidad es `id_tramite`, y
+`por_tramite()` colapsa el histórico antes de consolidar.
+
+Esto además contradice lo que decía `CLAUDE.md` sobre que en Córdoba un local no
+está habilitado bajo varios rubros a la vez. Sí lo está, igual que en CABA.
+
+**Cómo quedó la corrida con el titular real:**
+
+```
+144.743 filas -> 71.287 trámites -> 62.560 períodos de actividad
+                                    7.075 con al menos una renovación (11,3%)
+Plazo otorgado: 4,83 +/- 0,76 años (mediana 5,00)
+Chequeo de dominio: gastronomía 40,3% vs farmacia 43,5% -> OK
+```
+
+Los tres chequeos que pedía este documento dan bien.
+
+### Paso 2b — por qué esto todavía no cierra el bloqueante
+
+Pasar el chequeo de dominio no es lo mismo que haber sacado el artefacto.
+
+| Señal | Valor | Lectura |
+|---|---|---|
+| Renovaciones | 11,3% de los spells | Hay señal, pero el 89% sigue terminando en el escalón administrativo de los 5 años |
+| `mediana_anios` | 4,999316 en los 76 rubros | Sigue siendo el plazo del permiso. **No leerla como resultado** |
+| `s5` vs año mediano del rubro | Pearson 0,71 | La época sigue explicando buena parte de la tabla. Antes era 0,92 |
+| Ídem, restringido a altas ≤2019 | Pearson 0,58 | Baja, pero no desaparece |
+| `bar_restaurante` en esa cohorte | s5 = 95,3% con 215 spells | El outlier imposible del Paso 1, más chico. Sigue siendo un artefacto |
+
+Lo que hay que hacer, en orden:
+
+1. **Entender el 95% de `bar_restaurante`.** La sospecha: es un rubro que solo
+   existe en el nomenclador nuevo, así que todos sus spells son recientes y
+   quedan censurados. Si es eso, el problema no es Kaplan-Meier sino que hay
+   rubros sin cohortes viejas, y compararlos contra los que sí las tienen es
+   comparar épocas.
+2. **Estratificar por cohorte de alta** — una curva por rubro y año de alta — en
+   vez de mezclar doce años de altas en una sola curva. Si el orden entre rubros
+   se mantiene dentro de cada cohorte, la señal es real.
+3. **Ajustar por época explícitamente**, con el año de alta como covariable en
+   un Cox, en lugar de confiar en que la censura lo resuelva sola.
+
+Criterio de cierre: la correlación entre `s5` y el año mediano del rubro tiene
+que bajar a algo explicable por el negocio y no por el calendario. Con 0,58 no.
+
+### Los tests
+
+Cubierto por 14 tests entre `test_supervivencia.py` y `test_pipeline.py`. Los
+que fijan las decisiones:
+
+- `test_sin_consolidar_los_dos_rubros_se_ven_iguales`: construye dos rubros con
+  vidas de 20 y 5 años y verifica que, medidos trámite por trámite, den la misma
+  mediana. Si alguien saca la consolidación, falla.
+- `test_corta_si_la_vista_trae_el_titular_vacio`: el modo de falla que ya se dio
+  dos veces con esta fuente. Si la vista empezara a devolver el CUIT nulo, el
+  ingest corta en vez de producir curvas planas en silencio.
+- `test_el_cuit_no_queda_en_el_parquet`: el dato personal sale hasheado o no
+  sale.
+- `test_un_tramite_no_se_cuenta_dos_veces_en_el_mismo_rubro`: el nomenclador
+  viejo y el CLANAE nuevo describen lo mismo, y un trámite habilitado bajo ambos
+  caía dos veces en el mismo nivel2.
 
 ### Lo que falta
 
@@ -261,13 +329,24 @@ sí se versionan (son agregados, sin CUIT ni razón social).
 
 ## Lección de esta fase
 
-Tres veces seguidas, lo que parecía un resultado era un artefacto: `vigente`
-nulo leído como cierre, la antigüedad disfrazada de supervivencia, y la receta
-del Paso 2 que iba a medir el plazo del permiso creyendo medir la vida del
-comercio. **Ante un resultado llamativo, primero buscar el artefacto.** Un 95,6%
+Cuatro veces seguidas, lo que parecía un resultado era un artefacto: `vigente`
+nulo leído como cierre, la antigüedad disfrazada de supervivencia, la receta del
+Paso 2 que iba a medir el plazo del permiso creyendo medir la vida del comercio,
+y la consolidación que devolvía cero renovaciones porque consolidaba contra una
+columna vacía. **Ante un resultado llamativo, primero buscar el artefacto.** Un 95,6%
 de supervivencia en gastronomía es un bug, no un hallazgo.
 
 La tercera agrega algo a la lección: el artefacto no estaba en el código sino en
 el plan, y venía envuelto en una herramienta correcta. Usar `lifelines` no
 protege de medir la variable equivocada. **Antes de aplicar un método, medir el
 supuesto que lo habilita** — que es para lo que existe `plazos()`.
+
+La cuarta agrega otra: **esta fuente declara columnas que no popula.** Pasó con
+`vigente` y con `cuitempresa`, las dos veces con la variable objetivo de por
+medio. Que el schema tenga el campo no quiere decir que tenga el dato: mirar el
+`null_count` antes de construir algo encima, y hacer que el pipeline corte solo
+cuando una columna clave venga vacía.
+
+Y una quinta, más chica pero cara: **confirmar de qué es una fila antes de
+contarla.** Durante toda la Fase 1 se reportaron 144.743 habilitaciones donde
+había 71.287 trámites, porque nadie chequeó si `id_tramite` se repetía.

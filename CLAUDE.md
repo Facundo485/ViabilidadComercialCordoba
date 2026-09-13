@@ -80,10 +80,29 @@ corregirlo.)
 | Capa | Contenido |
 |---|---|
 | `0` — Habilitaciones Históricas | Un punto por parcela, con `hab_total`, `hab_vigentes`, `hab_novigentes`. WGS84 nativo |
-| `1` — Historial Habilitaciones | Un registro por habilitación: `rubronombre`, `fechahabaprobada`, `fechavencimientohab`, `cuitempresa`, `razonsocial` |
+| `1` — Historial Habilitaciones | Un registro por **trámite y rubro**: `rubronombre`, `fechahabaprobada`, `fechavencimientohab`, `id_tramite` |
 
 Se unen por `nro_catastral`. Cobertura: **2014-01-02 a 2026-09-02**, 144.743
-habilitaciones sobre 7.533 manzanas. La capa se recarga completa y está al día.
+filas sobre 7.533 manzanas. La capa se recarga completa y está al día.
+
+**Las filas no son habilitaciones.** Son **71.287 trámites**: un trámite habilita
+varios rubros a la vez (media 2,03, máximo 73) y aparece una vez por cada uno.
+La unidad de conteo es `id_tramite`. Los conteos de la Fase 1 estaban inflados
+al doble por no haber chequeado esto.
+
+**`cuitempresa` y `razonsocial` vienen nulas en el 100% de las filas** de la
+tabla 1, igual que `vigente`: el schema las declara y nadie las popula. Sin
+titular no se pueden encadenar renovaciones, que es lo único que distingue a un
+comercio que sobrevive. El titular sale de otro servicio del mismo GIS:
+
+```
+https://gis.cordoba.gob.ar/server/rest/services/ComerdioIndustria/Habilitaciones_Comerciales_Vista/FeatureServer
+```
+
+Su capa `0` es una fila por trámite, con `cuitempresa` poblada (cero nulos,
+46.767 titulares), y su campo `id` matchea `id_tramite` del histórico en los
+71.287. Trae además `barrio`, `cpc`, `riesgo` y las superficies. El ingest la
+baja y hashea el CUIT antes de escribirlo.
 
 **Cómo se define la supervivencia.** La columna `vigente` de la tabla 1 viene
 nula en el 100% de las filas: el schema la declara pero nadie la popula. Se
@@ -107,9 +126,12 @@ fuentes independientes, el mismo número.
   ceros en las 76 categorías sin que nada fallara.
 
 **Datos personales.** `cuitempresa` y `razonsocial` identifican personas: en un
-monotributista el CUIT sale del DNI y la razón social suele ser su nombre. Usar
-solo internamente, para unir registros y detectar cadenas. Agregar antes de
-mostrar: el mapa habla de manzanas y rubros, nunca de titulares.
+monotributista el CUIT sale del DNI y la razón social suele ser su nombre. El
+ingest reemplaza el CUIT por un hash (`titular`) antes de escribir nada a disco
+y no descarga `razonsocial`. Es seudonimización, no anonimización —el espacio de
+CUITs es chico— así que la protección real sigue siendo que `data/` no se
+versiona y que todo lo que se publica va agregado: el mapa habla de manzanas y
+rubros, nunca de titulares.
 
 ## Taxonomía de rubros (resuelto para Córdoba)
 
@@ -139,8 +161,9 @@ Todo lo que cae en `industria y deposito` (mayoristas, fábricas, depósitos)
 queda fuera del análisis: no son comercios a la calle.
 
 Comparar contra la nomenclatura de CABA cuando se aborde esa ciudad: usa 843
-códigos entre 2015-2018 y 423 desde 2019, y cada local puede estar habilitado
-bajo varios rubros a la vez, cosa que en Córdoba no pasa.
+códigos entre 2015-2018 y 423 desde 2019. Ahí cada local puede estar habilitado
+bajo varios rubros a la vez — y en Córdoba también, contra lo que se creía: son
+2,03 rubros por trámite en promedio.
 
 ## Fuentes de datos
 
@@ -228,7 +251,7 @@ React/
     │   ├── config.py          # fuentes, rutas, parámetros
     │   ├── rubros.py          # reglas de agrupamiento
     │   ├── mapeo.py           # genera mapeo_rubros.csv
-    │   ├── ingest.py          # descarga y limpia
+    │   ├── ingest.py          # descarga, limpia y hashea el CUIT
     │   ├── manzanas.py        # agrega a manzana (su tasa_supervivencia está viciada)
     │   ├── resumen.py         # CSV agregados para revisar o commitear
     │   ├── diagnostico.py     # chequea que la tasa no mida antigüedad
@@ -279,7 +302,7 @@ limpia, lo agrupa por rubro y lo agrega a nivel manzana.
 
 | | |
 |---|---|
-| Habilitaciones | 144.743 (2014-2026) |
+| Trámites | 71.287 (2014-2026), en 144.743 filas trámite x rubro |
 | Manzanas | 7.533 |
 | Supervivencia de la ciudad | 33,1% |
 | Rubros | 1377 → 76 de nivel 2 → 12 de nivel 1 |
@@ -312,17 +335,29 @@ se parece a esa proporción, *es* esa proporción. Un modelo de dos parámetros
 el rubro— explica el 87% de la varianza entre rubros. La tabla de supervivencia
 por rubro no contiene información sobre los rubros.
 
-**El reemplazo está implementado** (`supervivencia.py`, Kaplan-Meier con
-`lifelines`), pero todavía no corrió sobre los datos reales. Falta esa
-validación antes de dar el bloqueante por cerrado.
+**El reemplazo ya corrió sobre los datos reales y el bloqueante está a medias.**
+`supervivencia.py` consolida renovaciones y hace Kaplan-Meier con `lifelines`.
+Con el titular real (11,3% de los períodos tienen al menos una renovación) el
+chequeo de dominio pasa —gastronomía 40,3% contra farmacia 43,5%— pero la época
+sigue explicando buena parte de la tabla: `s5` correlaciona 0,71 con el año
+mediano del rubro, y 0,58 restringiendo a cohortes con ventana completa. La
+`mediana_anios` sigue dando 4,999 en los 76 rubros, que es el plazo del permiso.
+No leer la tabla por rubro como resultado todavía. El Paso 2b está en
+`docs/proximo-paso.md`.
 
 **La unidad de análisis no es la habilitación: es el período de actividad.** La
 resta `fechavencimientohab - fechahabaprobada` no mide la vida del comercio sino
 el plazo que otorgó el municipio, que es ~constante. Medida así, una habilitación
 vencida dura ~5 años por definición administrativa y Kaplan-Meier vuelve a medir
 época. Lo que separa al que sobrevive es **si renovó**, así que hay que encadenar
-las habilitaciones sucesivas de un mismo `cuitempresa` en un mismo
-`nro_catastral`. No revertir a medir habilitaciones sueltas: hay un test que lo
-impide (`test_sin_consolidar_los_dos_rubros_se_ven_iguales`).
+los trámites sucesivos de un mismo `titular` en un mismo `nro_catastral`. No
+revertir a medir habilitaciones sueltas: hay un test que lo impide
+(`test_sin_consolidar_los_dos_rubros_se_ven_iguales`).
+
+**El titular no está en el histórico.** `cuitempresa` viene nula en el 100% de
+las filas, así que la primera versión de la consolidación agrupaba contra una
+columna vacía y daba cero renovaciones sin que nada fallara. Sale de la vista de
+trámites (ver "La variable objetivo") y llega hasheado. Si el ingest se saltea
+esa capa, el Paso 2 vuelve a medir el plazo del permiso.
 
 El detalle, el diagnóstico y los pasos están en **`docs/proximo-paso.md`**.

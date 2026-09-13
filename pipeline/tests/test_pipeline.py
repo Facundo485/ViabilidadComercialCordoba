@@ -25,11 +25,35 @@ RUBROS_REALES = [
 ]
 
 
-def _falso_gis(monkeypatch, parcelas: list[dict], historial: list[dict]) -> None:
+def _falso_gis(
+    monkeypatch, parcelas: list[dict], historial: list[dict], tramites: list[dict] | None = None
+) -> None:
+    """Mockea las tres capas. Hay que mirar la base y no solo el número de capa:
+    las parcelas y los trámites son las dos capa 0 de servicios distintos."""
+
     def paginar(base, capa, **kw):
+        if base == config.GIS_BASE_VISTA:
+            return iter(tramites if tramites is not None else _tramites_de(historial))
         return iter(parcelas if capa == config.CAPA_PARCELAS else historial)
 
     monkeypatch.setattr(arcgis, "paginar", paginar)
+
+
+def _tramites_de(historial: list[dict]) -> list[dict]:
+    """Arma la vista de trámites a partir del histórico, un titular por trámite."""
+    vistos: dict[int, dict] = {}
+    for h in historial:
+        vistos.setdefault(
+            h["id_tramite"],
+            {
+                "id": h["id_tramite"],
+                "nrocatastral": h["nro_catastral"],
+                "cuitempresa": f"20{h['id_tramite']:09d}",
+                "barrio": "AYACUCHO",
+                "cpc": "CENTRO AMERICA",
+            },
+        )
+    return list(vistos.values())
 
 
 @pytest.fixture
@@ -58,6 +82,7 @@ def datos():
                 historial.append(
                     {
                         "objectid": len(historial) + 1,
+                        "id_tramite": len(historial) + 1,
                         "nro_catastral": nro,
                         "rubronombre": random.choice(RUBROS_REALES),
                         "vigente": random.randint(0, 1),
@@ -156,3 +181,61 @@ def test_el_suavizado_baja_las_tasas_perfectas_de_poco_volumen(monkeypatch, dato
     perfectas = detalle.filter((pl.col("tasa_cruda") == 1.0) & (pl.col("total") <= 2))
     assert len(perfectas) > 0, "el fixture no generó el caso"
     assert (perfectas["tasa_supervivencia"] < 1.0).all()
+
+
+def test_el_cuit_no_queda_en_el_parquet(monkeypatch, datos):
+    """`cuitempresa` identifica personas: sale hasheado del ingest o no sale."""
+    _falso_gis(monkeypatch, *datos)
+    tramites = ingest.descargar_tramites()
+
+    assert "cuitempresa" not in tramites.columns
+    assert "razonsocial" not in tramites.columns
+    assert tramites["titular"].null_count() == 0
+    assert tramites["titular"].str.len_chars().max() == config.LARGO_HASH_CUIT * 2
+
+
+def test_el_hash_del_titular_es_estable_y_distingue_titulares():
+    """Para encadenar renovaciones alcanza con que sea estable y no colisione."""
+    assert ingest.seudonimo("20123456789") == ingest.seudonimo("20123456789")
+    assert ingest.seudonimo("20123456789") != ingest.seudonimo("20123456780")
+    assert ingest.seudonimo(None) is None
+    assert ingest.seudonimo("  ") is None
+
+
+def test_el_historial_queda_con_titular(monkeypatch, datos):
+    """Sin esto `supervivencia` consolida contra una columna vacía: es lo que pasó."""
+    _falso_gis(monkeypatch, *datos)
+    df = ingest.descargar_historial()
+
+    assert df["titular"].null_count() == 0
+    assert df["titular"].n_unique() > 1
+
+
+def test_corta_si_la_vista_trae_el_titular_vacio(monkeypatch, datos):
+    """Regresión: el histórico ya declara `cuitempresa` y la devuelve nula en el
+    100% de las filas. Si la vista hiciera lo mismo, la consolidación daría cero
+    renovaciones sin que nada fallara."""
+    parcelas, historial = datos
+    vacios = [dict(t, cuitempresa=None) for t in _tramites_de(historial)]
+    _falso_gis(monkeypatch, parcelas, historial, tramites=vacios)
+
+    with pytest.raises(ValueError, match="titular"):
+        ingest.descargar_tramites()
+
+
+def test_un_tramite_no_se_cuenta_dos_veces_en_el_mismo_rubro(monkeypatch, datos):
+    """El nomenclador viejo y el CLANAE nuevo describen lo mismo: un trámite
+    habilitado bajo ambos cae dos veces en el mismo nivel2 si no se deduplica."""
+    parcelas, historial = datos
+    # Las dos entradas caen en nivel2 "almacen": una es del nomenclador viejo y
+    # la otra del CLANAE nuevo.
+    duplicado = dict(historial[0], objectid=999_999, rubronombre="Almacén de comestibles")
+    gemelo = dict(duplicado, objectid=999_998, rubronombre="VENTA AL POR MENOR EN MINIMERCADOS")
+    _falso_gis(monkeypatch, parcelas, [*historial, duplicado, gemelo])
+
+    detalle = manzanas.por_rubro(ingest.descargar_historial())
+    del_tramite = detalle.filter(
+        (pl.col("manzana") == historial[0]["nro_catastral"][:9]) & (pl.col("nivel2") == "almacen")
+    )
+    # Los dos rubronombre caen en "almacen": el trámite tiene que sumar 1, no 2.
+    assert del_tramite["total"].sum() == 1

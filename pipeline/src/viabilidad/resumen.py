@@ -24,12 +24,14 @@ def generar() -> None:
     por_rubro = (
         det.group_by("nivel2", "nivel1")
         .agg(
-            pl.col("total").sum().alias("habilitaciones"),
+            # Trámites y no habilitaciones: el histórico trae una fila por
+            # trámite y rubro, y un trámite habilita varios rubros a la vez.
+            pl.col("total").sum().alias("tramites"),
             pl.col("vigentes").sum(),
             pl.len().alias("manzanas"),
         )
-        .with_columns((pl.col("vigentes") / pl.col("habilitaciones")).round(3).alias("tasa"))
-        .sort("habilitaciones", descending=True)
+        .with_columns((pl.col("vigentes") / pl.col("tramites")).round(3).alias("tasa"))
+        .sort("tramites", descending=True)
     )
     por_rubro.write_csv(config.RAIZ / "resumen_rubros.csv")
 
@@ -38,7 +40,7 @@ def generar() -> None:
 
     print("\nSupervivencia por rubro (los 15 de más volumen):")
     with pl.Config(tbl_rows=15, fmt_str_lengths=24, tbl_hide_dataframe_shape=True):
-        print(por_rubro.select("nivel2", "nivel1", "habilitaciones", "vigentes", "tasa").head(15))
+        print(por_rubro.select("nivel2", "nivel1", "tramites", "vigentes", "tasa").head(15))
 
 
 def _alertar_si_degenerado(por_rubro: pl.DataFrame) -> None:

@@ -1,7 +1,8 @@
-"""Descarga las dos capas del GIS y las deja limpias en parquet."""
+"""Descarga las capas del GIS y las deja limpias en parquet."""
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from datetime import datetime
 
@@ -48,8 +49,90 @@ def descargar_parcelas() -> pl.DataFrame:
     )
 
 
-def descargar_historial() -> pl.DataFrame:
-    """Tabla 1: un registro por habilitación, con rubro y fechas."""
+def seudonimo(cuit: str | None) -> str | None:
+    """Hash estable del CUIT, para encadenar renovaciones sin guardar el número.
+
+    Estable entre corridas (misma sal, mismo hash) y suficiente para agrupar:
+    lo único que se le pide al identificador de titular es que dos trámites de
+    la misma persona caigan juntos. Ver la nota de `config.SAL_CUIT` sobre por
+    qué esto es seudonimización y no anonimización.
+    """
+    if cuit is None or not str(cuit).strip():
+        return None
+    return hashlib.blake2b(
+        str(cuit).strip().encode(),
+        key=config.SAL_CUIT.encode(),
+        digest_size=config.LARGO_HASH_CUIT,
+    ).hexdigest()
+
+
+def descargar_tramites() -> pl.DataFrame:
+    """Capa 0 de la vista: una fila por trámite, con el titular poblado.
+
+    Es la capa que destraba el Paso 2. El histórico trae `cuitempresa` nula en
+    el 100% de las filas, así que sin esto no hay forma de saber si una
+    habilitación nueva es un comercio nuevo o la renovación del de al lado.
+
+    El CUIT nunca llega al parquet: sale de acá ya hasheado como `titular`, y
+    `razonsocial` ni se pide.
+    """
+    log.info("Descargando trámites (vista, capa %s)...", config.CAPA_TRAMITES)
+    filas = list(
+        arcgis.paginar(
+            config.GIS_BASE_VISTA,
+            config.CAPA_TRAMITES,
+            con_geometria=False,
+            page_size=config.PAGE_SIZE,
+        )
+    )
+    # infer_schema_length=None: `numero` mezcla enteros con textos tipo "3660/70".
+    df = pl.DataFrame(filas, infer_schema_length=None)
+
+    if faltan := [c for c in ("id", "cuitempresa") if c not in df.columns]:
+        raise ValueError(f"La vista de trámites no trae {faltan}; sin eso no hay titular.")
+
+    df = df.select([c for c in config.CAMPOS_TRAMITE if c in df.columns]).rename(
+        {"id": "id_tramite", "nrocatastral": "nro_catastral"}
+    )
+    df = df.with_columns(
+        pl.col("cuitempresa")
+        .cast(pl.Utf8)
+        .map_elements(seudonimo, return_dtype=pl.Utf8)
+        .alias("titular")
+    ).drop("cuitempresa")
+
+    _verificar_titulares(df)
+    return df
+
+
+def _verificar_titulares(df: pl.DataFrame) -> None:
+    """Corta si la vista trae el titular tan vacío como el histórico.
+
+    Es el modo de falla que ya se dio dos veces con esta fuente (`vigente` y
+    `cuitempresa`): el schema declara la columna y nadie la popula. Detectarlo
+    acá evita que `supervivencia` devuelva curvas planas sin que nada falle.
+    """
+    nulos = df["titular"].null_count()
+    if nulos == len(df):
+        raise ValueError(
+            "La vista devolvió el titular vacío en todas las filas. Es el mismo "
+            "problema que tiene `cuitempresa` en el histórico: sin titular no se "
+            "pueden encadenar renovaciones. Revisá la capa antes de seguir."
+        )
+    if nulos:
+        log.warning("%s trámites sin titular: cada uno queda como su propio período.", f"{nulos:,}")
+    log.info(
+        "Trámites: %s, %s titulares distintos", f"{len(df):,}", f"{df['titular'].n_unique():,}"
+    )
+
+
+def descargar_historial(tramites: pl.DataFrame | None = None) -> pl.DataFrame:
+    """Tabla 1: un registro por trámite y rubro, con fechas y titular.
+
+    Ojo con el conteo: las filas no son habilitaciones. Un mismo trámite habilita
+    varios rubros a la vez (media 2,03, máximo 73) y aparece una vez por cada
+    uno, así que contar filas infla todo al doble. La unidad es `id_tramite`.
+    """
     log.info("Descargando historial (tabla %s)...", config.TABLA_HISTORIAL)
     filas = list(
         arcgis.paginar(
@@ -66,7 +149,40 @@ def descargar_historial() -> pl.DataFrame:
         _vigencia(),
     )
     _verificar_vigencia(df)
-    return _con_rubro(df)
+    return _con_titular(_con_rubro(df), tramites)
+
+
+def _con_titular(df: pl.DataFrame, tramites: pl.DataFrame | None) -> pl.DataFrame:
+    """Adjunta el titular hasheado uniendo por `id_tramite` contra la vista.
+
+    El histórico es una fila por trámite y rubro; la vista, una por trámite. El
+    join es 1:N y no duplica nada.
+    """
+    if tramites is None:
+        tramites = descargar_tramites()
+
+    unido = df.join(tramites.select("id_tramite", "titular"), on="id_tramite", how="left")
+    _verificar_cobertura_titular(unido)
+    return unido
+
+
+def _verificar_cobertura_titular(df: pl.DataFrame) -> None:
+    """Un join que no matchea casi nada deja el Paso 2 sin clave y hay que verlo."""
+    sin_titular = df["titular"].null_count()
+    cobertura = 1 - sin_titular / len(df) if len(df) else 0.0
+    if cobertura == 0:
+        raise ValueError(
+            "Ningún registro del histórico matcheó con la vista de trámites. "
+            "Revisá que `id_tramite` siga siendo la clave común entre las dos capas."
+        )
+    if cobertura < 0.9:
+        log.warning(
+            "Solo el %.1f%% del histórico quedó con titular. Las renovaciones de "
+            "lo que falta no se van a poder encadenar.",
+            cobertura * 100,
+        )
+    else:
+        log.info("Historial con titular: %.1f%%", cobertura * 100)
 
 
 def _vigencia() -> pl.Expr:
@@ -135,8 +251,17 @@ def ejecutar() -> tuple[pl.DataFrame, pl.DataFrame]:
     parcelas.write_parquet(config.DIR_CRUDO / "parcelas.parquet")
     log.info("Parcelas: %s filas", f"{len(parcelas):,}")
 
-    historial = descargar_historial()
+    tramites = descargar_tramites()
+    tramites.write_parquet(config.DIR_CRUDO / "tramites.parquet")
+
+    historial = descargar_historial(tramites)
     historial.write_parquet(config.DIR_CRUDO / "historial.parquet")
-    log.info("Habilitaciones: %s filas", f"{len(historial):,}")
+    # Las filas no son habilitaciones: un trámite habilita varios rubros a la vez
+    # y aparece una vez por rubro. La unidad de conteo es el trámite.
+    log.info(
+        "Historial: %s filas (trámite x rubro) sobre %s trámites",
+        f"{len(historial):,}",
+        f"{historial['id_tramite'].n_unique():,}",
+    )
 
     return parcelas, historial

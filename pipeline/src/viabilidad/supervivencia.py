@@ -17,11 +17,24 @@ de sus registros es reciente. Otra vez época disfrazada de supervivencia.
 Lo que distingue a un comercio que sobrevive no es que su permiso venza —vence
 siempre— sino **si lo renovó**. Así que la unidad de análisis no es la
 habilitación: es el período de actividad (`spell`) de un titular en una
-dirección, que puede abarcar varias habilitaciones encadenadas.
+dirección, que puede abarcar varios trámites encadenados.
 
-    spell = habilitaciones sucesivas de (cuitempresa, nro_catastral)
-            sin un hueco mayor a HUECO_DIAS entre el vencimiento de una
-            y el alta de la siguiente
+    spell = trámites sucesivos de (titular, nro_catastral)
+            sin un hueco mayor a HUECO_DIAS entre el vencimiento de uno
+            y el alta del siguiente
+
+El titular sale de `data/crudo/tramites.parquet`, no del histórico: el histórico
+declara `cuitempresa` y la devuelve nula en el 100% de las filas, así que la
+primera versión de este módulo consolidaba contra una columna vacía y daba cero
+renovaciones sin que nada fallara. Viene hasheado desde el ingest.
+
+Dos apuntes sobre la unidad de conteo:
+
+- Las filas del histórico son trámite x rubro, no trámites. Un trámite habilita
+  varios rubros a la vez, así que acá primero se colapsa a un trámite por fila.
+- Un spell puede tener varios rubros. Entra en la curva de cada uno, que es lo
+  que corresponde —el local compite en todos—, pero implica que los `spells` de
+  la tabla por rubro suman más que el total de spells.
 
     cierre    = el permiso caducó y no se renovó
     censura   = todavía tiene permiso vigente (sigue abierto hasta donde vemos)
@@ -59,7 +72,13 @@ MIN_SPELLS = 100
 # es el que importa acá, porque es donde cae el primer vencimiento.
 HORIZONTES = (3, 5)
 
-COLUMNAS_CLAVE = ["cuitempresa", "nro_catastral", "fechahabaprobada", "fechavencimientohab"]
+COLUMNAS_CLAVE = [
+    "id_tramite",
+    "titular",
+    "nro_catastral",
+    "fechahabaprobada",
+    "fechavencimientohab",
+]
 
 
 def _historial() -> pl.DataFrame:
@@ -70,7 +89,11 @@ def _historial() -> pl.DataFrame:
         )
     df = pl.read_parquet(archivo)
     if faltan := [c for c in COLUMNAS_CLAVE if c not in df.columns]:
-        raise ValueError(f"El historial no trae {faltan}; sin eso no se puede medir duración.")
+        raise ValueError(
+            f"El historial no trae {faltan}; sin eso no se puede medir duración. "
+            "Si falta `titular`, el parquet es de antes de que el ingest sumara "
+            "la vista de trámites: volvé a correr `python -m viabilidad ingest`."
+        )
     return df
 
 
@@ -102,6 +125,24 @@ def plazos(h: pl.DataFrame) -> pl.DataFrame:
     )
 
 
+def por_tramite(h: pl.DataFrame) -> pl.DataFrame:
+    """Colapsa el histórico a una fila por trámite, con sus rubros como lista.
+
+    El histórico trae una fila por trámite y rubro. Sin colapsar, un local
+    habilitado en tres rubros entraría tres veces al conteo de períodos y
+    ensancharía artificialmente cualquier tabla agregada.
+    """
+    return h.group_by("id_tramite").agg(
+        pl.col("titular").first(),
+        pl.col("nro_catastral").first(),
+        pl.col("manzana").first(),
+        pl.col("fechahabaprobada").min(),
+        pl.col("fechavencimientohab").max(),
+        pl.col("nivel2").unique(),
+        pl.col("nivel1").unique(),
+    )
+
+
 def consolidar(h: pl.DataFrame) -> pl.DataFrame:
     """Encadena las renovaciones de un mismo titular en una misma dirección.
 
@@ -109,18 +150,23 @@ def consolidar(h: pl.DataFrame) -> pl.DataFrame:
     comercios de 5 años, y la supervivencia medida da exactamente el plazo del
     permiso.
 
-    Las filas sin `cuitempresa` no se pueden encadenar con nada, así que cada
-    una queda como su propio spell: es la lectura conservadora (subestima la
+    Las filas sin `titular` no se pueden encadenar con nada, así que cada una
+    queda como su propio spell: es la lectura conservadora (subestima la
     duración) y no inventa vínculos entre titulares distintos.
     """
-    base = h.filter(
+    return consolidar_tramites(por_tramite(h))
+
+
+def consolidar_tramites(t: pl.DataFrame) -> pl.DataFrame:
+    """Igual que `consolidar`, sobre una tabla que ya viene con un trámite por fila."""
+    base = t.filter(
         pl.col("fechahabaprobada").is_not_null() & pl.col("fechavencimientohab").is_not_null()
     )
     if base.is_empty():
-        raise ValueError("Ninguna habilitación tiene las dos fechas; no hay duración que medir.")
+        raise ValueError("Ningún trámite tiene las dos fechas; no hay duración que medir.")
 
     base = base.with_columns(
-        pl.coalesce(pl.col("cuitempresa").cast(pl.Utf8), pl.lit("__sin_cuit__")).alias("_titular")
+        pl.coalesce(pl.col("titular").cast(pl.Utf8), pl.lit("__sin_titular__")).alias("_titular")
     ).sort("_titular", "nro_catastral", "fechahabaprobada")
 
     grupo = ["_titular", "nro_catastral"]
@@ -139,8 +185,8 @@ def consolidar(h: pl.DataFrame) -> pl.DataFrame:
         .over(grupo)
         .alias("_spell")
     ).with_columns(
-        pl.when(pl.col("_titular") == "__sin_cuit__")
-        .then(pl.col("objectid").cast(pl.Utf8))
+        pl.when(pl.col("_titular") == "__sin_titular__")
+        .then(pl.col("id_tramite").cast(pl.Utf8))
         .otherwise(pl.col("_spell").cast(pl.Utf8))
         .alias("_spell")
     )
@@ -150,9 +196,9 @@ def consolidar(h: pl.DataFrame) -> pl.DataFrame:
         .agg(
             pl.col("fechahabaprobada").min().alias("inicio"),
             pl.col("fechavencimientohab").max().alias("fin_cobertura"),
-            pl.len().alias("habilitaciones"),
-            pl.col("nivel2").first(),
-            pl.col("nivel1").first(),
+            pl.len().alias("tramites"),
+            pl.col("nivel2").explode(empty_as_null=False).unique(),
+            pl.col("nivel1").explode(empty_as_null=False).unique(),
             pl.col("manzana").first(),
         )
         .drop("_spell", "_titular")
@@ -193,8 +239,15 @@ def kaplan_meier(d: pl.DataFrame, por: str) -> pl.DataFrame:
 
     KM es lo que maneja bien la censura: un local abierto hace 6 meses aporta
     "sobrevivió al menos 6 meses" sin contarse como éxito ni como fracaso.
+
+    Si la categoría viene como lista —un spell habilitado en varios rubros— el
+    spell entra en la curva de cada uno de sus rubros. Es lo que corresponde,
+    pero hace que la columna `spells` sume más que el total de spells.
     """
     from lifelines import KaplanMeierFitter
+
+    if isinstance(d.schema[por], pl.List):
+        d = d.explode(por, empty_as_null=False)
 
     filas = []
     for (categoria,), grupo in d.group_by(por, maintain_order=True):
@@ -269,9 +322,15 @@ def ejecutar() -> None:
     h = _historial()
     print(f"\n{'=' * 72}\n  Paso 2 — supervivencia con Kaplan-Meier\n{'=' * 72}")
 
-    p = plazos(h)
+    t = por_tramite(h)
+    print(
+        f"\n{len(h):,} filas del histórico (trámite x rubro) -> {len(t):,} trámites. "
+        f"{len(h) / len(t):.2f} rubros por trámite en promedio."
+    )
+
+    p = plazos(t)
     media, desvio = p["media"][0], p["desvio"][0]
-    print(f"\nPlazo otorgado por habilitación (n={p['n'][0]:,}):")
+    print(f"\nPlazo otorgado por trámite (n={p['n'][0]:,}):")
     with pl.Config(tbl_hide_dataframe_shape=True, float_precision=2):
         print(p.select("media", "desvio", "p10", "mediana", "p90"))
     if desvio < 0.5:
@@ -281,12 +340,18 @@ def ejecutar() -> None:
             "  medir supervivencia exige encadenar las renovaciones."
         )
 
-    spells = consolidar(h)
-    renovados = spells.filter(pl.col("habilitaciones") > 1).height
+    spells = consolidar_tramites(t)
+    renovados = spells.filter(pl.col("tramites") > 1).height
     print(
-        f"\n{len(h):,} habilitaciones -> {len(spells):,} períodos de actividad "
-        f"({renovados:,} con al menos una renovación)."
+        f"\n{len(t):,} trámites -> {len(spells):,} períodos de actividad "
+        f"({renovados:,} con al menos una renovación, {renovados / len(spells):.1%})."
     )
+    if renovados == 0:
+        log.error(
+            "Cero renovaciones encadenadas. O el titular vino vacío, o el municipio "
+            "no registra las renovaciones como trámites nuevos. En cualquier caso "
+            "estas curvas miden el plazo del permiso: no las leas como resultado."
+        )
 
     d = duraciones(spells)
     print(

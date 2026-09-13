@@ -1,13 +1,18 @@
 """Tests del Paso 2: supervivencia sobre períodos de actividad consolidados.
 
-Los datos sintéticos imitan la estructura real del GIS —plazos de 5 años fijos y
-renovaciones cargadas como habilitaciones nuevas— porque es justamente esa
-estructura la que hace que la receta ingenua mida el calendario en vez del
-comercio.
+Los datos sintéticos imitan la estructura real del GIS —plazos de 5 años fijos,
+renovaciones cargadas como trámites nuevos y una fila por trámite y rubro—
+porque es justamente esa estructura la que hace que la receta ingenua mida el
+calendario en vez del comercio.
+
+El titular viene hasheado desde el ingest (`titular`, no `cuitempresa`): el
+histórico declara el CUIT pero lo devuelve nulo en el 100% de las filas, y sale
+de la vista de trámites.
 """
 
 from __future__ import annotations
 
+import itertools
 from datetime import datetime, timedelta
 
 import polars as pl
@@ -18,31 +23,46 @@ from viabilidad import supervivencia
 HOY = datetime(2026, 9, 1)
 PLAZO = timedelta(days=int(5 * supervivencia.DIAS_ANIO))
 
+# Los id de trámite tienen que ser únicos entre llamadas: `por_tramite` agrupa
+# por ahí, y dos trámites distintos con el mismo id se colapsan en uno.
+_ID_TRAMITE = itertools.count(1)
+
 
 def habilitaciones(
-    *, nivel2: str, nivel1: str, n: int, renovaciones: int, alta: datetime, cuit_base: int
+    *,
+    nivel2: str,
+    nivel1: str,
+    n: int,
+    renovaciones: int,
+    alta: datetime,
+    cuit_base: int,
+    rubros_extra: tuple[str, ...] = (),
 ) -> list[dict]:
     """Genera `n` comercios que renuevan `renovaciones` veces, con plazo fijo.
 
-    Cada renovación es una fila más, como las carga el municipio: encadenarlas
-    es trabajo de `consolidar()`.
+    Cada renovación es un trámite más, como los carga el municipio: encadenarlos
+    es trabajo de `consolidar()`. Y cada trámite aparece una vez por rubro, que
+    es como viene el histórico: colapsarlos es trabajo de `por_tramite()`.
     """
     filas = []
     for i in range(n):
         inicio = alta
         for _ in range(renovaciones + 1):
-            filas.append(
-                {
-                    "objectid": len(filas) + 1 + cuit_base * 10_000,
-                    "nro_catastral": f"01-01-{cuit_base:03d}-{i:03d}",
-                    "cuitempresa": f"20{cuit_base:03d}{i:05d}9",
-                    "fechahabaprobada": inicio,
-                    "fechavencimientohab": inicio + PLAZO,
-                    "nivel2": nivel2,
-                    "nivel1": nivel1,
-                    "manzana": f"01-01-{cuit_base:03d}",
-                }
-            )
+            tramite = next(_ID_TRAMITE)
+            for rubro in (nivel2, *rubros_extra):
+                filas.append(
+                    {
+                        "objectid": len(filas) + 1 + cuit_base * 100_000,
+                        "id_tramite": tramite,
+                        "nro_catastral": f"01-01-{cuit_base:03d}-{i:03d}",
+                        "titular": f"titular-{cuit_base:03d}-{i:05d}",
+                        "fechahabaprobada": inicio,
+                        "fechavencimientohab": inicio + PLAZO,
+                        "nivel2": rubro,
+                        "nivel1": nivel1,
+                        "manzana": f"01-01-{cuit_base:03d}",
+                    }
+                )
             inicio = inicio + PLAZO
     return filas
 
@@ -79,13 +99,13 @@ def test_las_renovaciones_se_encadenan_en_un_solo_periodo(mercado):
     medida termina siendo el plazo del permiso."""
     spells = supervivencia.consolidar(mercado)
 
-    duraderos = spells.filter(pl.col("nivel2") == "duradero")
-    assert len(duraderos) == 150, "cuatro habilitaciones encadenadas son un período"
-    assert (duraderos["habilitaciones"] == 4).all()
+    duraderos = spells.filter(pl.col("nivel2").list.contains("duradero"))
+    assert len(duraderos) == 150, "cuatro trámites encadenados son un período"
+    assert (duraderos["tramites"] == 4).all()
 
-    efimeros = spells.filter(pl.col("nivel2") == "efimero")
+    efimeros = spells.filter(pl.col("nivel2").list.contains("efimero"))
     assert len(efimeros) == 150
-    assert (efimeros["habilitaciones"] == 1).all()
+    assert (efimeros["tramites"] == 1).all()
 
 
 def test_un_hueco_largo_corta_el_periodo():
@@ -162,7 +182,7 @@ def test_sin_consolidar_los_dos_rubros_se_ven_iguales(mercado):
     y no la vida del comercio. Si este test empieza a fallar, es que alguien
     sacó la consolidación.
     """
-    sin_consolidar = mercado.with_columns(
+    sin_consolidar = supervivencia.por_tramite(mercado).with_columns(
         pl.col("fechahabaprobada").alias("inicio"),
         pl.col("fechavencimientohab").alias("fin_cobertura"),
     )
