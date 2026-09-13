@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 
 import polars as pl
 
@@ -63,9 +64,39 @@ def descargar_historial() -> pl.DataFrame:
     df = _a_fecha(pl.DataFrame(filas), FECHAS_HISTORIAL)
 
     df = df.with_columns(
-        pl.col("nro_catastral").str.slice(0, config.LARGO_ID_MANZANA).alias("manzana")
+        pl.col("nro_catastral").str.slice(0, config.LARGO_ID_MANZANA).alias("manzana"),
+        _vigencia(),
     )
+    _verificar_vigencia(df)
     return _con_rubro(df)
+
+
+def _vigencia() -> pl.Expr:
+    """Resuelve `vigente` cayendo a la fecha de vencimiento cuando viene nulo.
+
+    Es la variable objetivo del proyecto, así que no se la puede rellenar con un
+    cero: eso convertiría "no sé" en "cerró" y sesgaría todo el modelo hacia
+    abajo. Si la tabla no la trae, se deduce de si el permiso todavía no venció.
+    """
+    derivada = (pl.col("fechavencimientohab") > pl.lit(datetime.now())).cast(pl.Int8)
+    return pl.coalesce(pl.col("vigente").cast(pl.Int8), derivada).alias("vigente")
+
+
+def _verificar_vigencia(df: pl.DataFrame) -> None:
+    """Corta si la vigencia quedó degenerada: sin ella no hay nada que modelar."""
+    validas = df["vigente"].drop_nulls()
+    if validas.is_empty() or validas.sum() == 0:
+        raise ValueError(
+            "Ninguna habilitación quedó como vigente. Sin esta columna no hay "
+            "variable objetivo. Revisá `vigente` y `fechavencimientohab` en el "
+            "parquet crudo antes de seguir."
+        )
+    if nulos := df["vigente"].null_count():
+        log.warning(
+            "%s habilitaciones sin vigencia ni fecha de vencimiento: se excluyen.",
+            f"{nulos:,}",
+        )
+    log.info("Vigentes en el historial: %.1f%%", validas.mean() * 100)
 
 
 def _con_rubro(df: pl.DataFrame) -> pl.DataFrame:

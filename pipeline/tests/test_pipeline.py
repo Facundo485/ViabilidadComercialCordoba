@@ -103,6 +103,34 @@ def test_la_agregacion_no_pierde_habilitaciones(monkeypatch, datos):
     assert (mz["hab_total"] == mz["hab_vigentes"] + mz["hab_novigentes"]).all()
 
 
+def test_la_vigencia_nula_se_deriva_de_la_fecha_de_vencimiento(monkeypatch, datos):
+    """Regresión: `vigente` venía nulo del GIS y un fill_null(0) lo daba por cerrado.
+
+    Es la variable objetivo, así que rellenarla con cero sesga todo el modelo.
+    """
+    parcelas, historial = datos
+    futuro, pasado = 4_100_000_000_000, 1_600_000_000_000  # 2099 y 2020
+    sin_vigente = [
+        dict(h, vigente=None, fechavencimientohab=futuro if i % 2 else pasado)
+        for i, h in enumerate(historial)
+    ]
+    _falso_gis(monkeypatch, parcelas, sin_vigente)
+
+    df = ingest.descargar_historial()
+
+    assert df["vigente"].sum() > 0, "no dedujo ninguna vigencia"
+    assert df["vigente"].mean() == pytest.approx(0.5, abs=0.05)
+
+
+def test_corta_si_no_queda_ninguna_vigente(monkeypatch, datos):
+    parcelas, historial = datos
+    muertas = [dict(h, vigente=None, fechavencimientohab=None) for h in historial]
+    _falso_gis(monkeypatch, parcelas, muertas)
+
+    with pytest.raises(ValueError, match="vigente"):
+        ingest.descargar_historial()
+
+
 def test_los_mayoristas_quedan_fuera_del_detalle(monkeypatch, datos):
     _falso_gis(monkeypatch, *datos)
     detalle = manzanas.por_rubro(ingest.descargar_historial())

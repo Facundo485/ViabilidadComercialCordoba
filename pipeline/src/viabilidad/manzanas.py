@@ -60,8 +60,8 @@ def por_rubro(historial: pl.DataFrame) -> pl.DataFrame:
     detalle = historial.filter(pl.col("nivel1") != "industria y deposito")
 
     agregado = detalle.group_by("manzana", "nivel2", "nivel1").agg(
-        pl.len().alias("total"),
-        pl.col("vigente").fill_null(0).sum().alias("vigentes"),
+        pl.col("vigente").count().alias("total"),
+        pl.col("vigente").sum().alias("vigentes"),
     )
     promedios = _promedio_por_rubro(detalle)
 
@@ -88,7 +88,7 @@ def _promedio_por_rubro(detalle: pl.DataFrame) -> pl.DataFrame:
     número signifique algo.
     """
     return detalle.group_by("nivel2").agg(
-        (pl.col("vigente").fill_null(0).sum() / pl.len()).alias("promedio_rubro")
+        pl.col("vigente").mean().alias("promedio_rubro")
     )
 
 
