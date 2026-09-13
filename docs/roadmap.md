@@ -1,8 +1,30 @@
 # Roadmap — Plataforma de Scoring de Localización Comercial
 
-**Versión:** 1.0
-**Ciudad piloto:** Buenos Aires (CABA) → Expansión a Córdoba
+**Versión:** 2.0
+**Ciudad piloto:** Córdoba Capital → Expansión a Buenos Aires (CABA)
 **Objetivo:** Predecir la probabilidad de éxito de un tipo de negocio en una ubicación determinada, a partir de datos abiertos, geoespaciales y satelitales.
+
+---
+
+## Qué cambió en la v2
+
+El orden de ciudades se invirtió. La v1 ponía a CABA de piloto y a Córdoba en
+Fase 5, condicionada a un pedido de acceso a información pública.
+
+Córdoba publica el histórico de habilitaciones sin trámite, con fecha de alta,
+vencimiento, rubro y coordenadas: 144.743 registros entre 2014 y 2026. Eso
+resuelve la variable objetivo, que era el riesgo que podía convertir el proyecto
+en descriptivo, y lo resuelve por el Plan A. En CABA sigue sin confirmarse.
+
+Consecuencias sobre el plan original:
+
+- **Fase 0:** los tres trámites (información pública, EMFyC, OpenDataCórdoba)
+  quedan sin efecto.
+- **Fase 1:** cerrada. Ingesta, taxonomía de rubros y variable objetivo resueltas.
+- **Fase 5:** pasa a ser CABA, como prueba de transferibilidad entre ciudades.
+
+El detalle de las fuentes y de cómo se define la supervivencia está en
+`CLAUDE.md`.
 
 ---
 
@@ -22,11 +44,12 @@ Plataforma que asigna un **score de viabilidad comercial** a cualquier ubicació
 **Objetivo:** dejar todo listo para trabajar sin fricción.
 
 ### Tareas
-- [ ] Crear repositorio en GitHub con estructura de proyecto profesional
-- [ ] Configurar entorno: Python 3.11+, `venv` o `poetry`
-- [ ] Instalar stack base: `pandas`, `geopandas`, `shapely`, `scikit-learn`, `xgboost`, `folium`, `rasterio`
-- [ ] Configurar `pre-commit`, linting (`ruff`) y estructura de tests
-- [ ] Crear README con planteo del problema y objetivos
+- [x] Crear repositorio en GitHub con estructura de proyecto profesional
+- [x] Configurar entorno: Python 3.11+, `venv`
+- [x] Instalar stack base (`polars` en vez de `pandas`; ver `CLAUDE.md`)
+- [x] Estructura de tests
+- [ ] Configurar `pre-commit` y linting (`ruff`)
+- [x] Crear README con planteo del problema y objetivos
 
 ### Estructura sugerida del repositorio
 ```
@@ -46,51 +69,56 @@ site-score/
 └── README.md
 ```
 
-### En paralelo (trámites que corren solos)
-- [ ] Enviar pedido de acceso a información pública a la Municipalidad de Córdoba (habilitaciones comerciales con fecha de alta, baja, rubro y domicilio)
-- [ ] Contactar a OpenDataCórdoba (comunidad local de datos abiertos)
-- [ ] Escribir al EMFyC: `fiscalizacionycontrol@cordoba.gov.ar`
-- [ ] Descargar y leer el informe del proyecto previo de CABA ("Historias con Datos")
+### Trámites — sin efecto
+Los datos de Córdoba estaban abiertos en el GIS municipal. No hizo falta ningún
+pedido de acceso a información pública ni contactar al EMFyC.
+
+- [ ] Revisar el **Localizador de Oportunidades Comerciales** del municipio
+  (`cordoba.gob.ar/loc-filtros-consultados/`): es un buscador con filtros sobre
+  los mismos datos, sin modelo predictivo. Sirve para delimitar el diferencial.
 
 **Entregable:** repositorio funcional + trámites iniciados.
 
 ---
 
-## FASE 1 — Datos y exploración (Semanas 2-4)
-
-**Objetivo:** entender qué hay realmente en los datos antes de modelar.
+## FASE 1 — Datos y exploración ✅ COMPLETA
 
 ### 1.1 Ingesta
-- [ ] Descargar habilitaciones aprobadas de CABA (2015-2026) desde BA Data
-- [ ] Descargar datasets complementarios: comunas, barrios, usos del suelo, transporte
-- [ ] Obtener datos del Censo INDEC 2022 por radio censal
-- [ ] Descargar red vial y POIs desde OpenStreetMap (`osmnx`)
-- [ ] Escribir scripts de descarga reproducibles (no descargas manuales)
+- [x] Descargar el histórico de habilitaciones del GIS de Córdoba (2014-2026)
+- [x] Scripts de descarga reproducibles, con paginación y reintentos
+- [x] Limpieza por bounding box (la capa declara un extent hasta lat 90)
+- [ ] Datasets complementarios del portal: manzanas, barrios, zonificación, POIs
+- [ ] Censo INDEC 2022 por radio censal
+- [ ] Red vial y POIs de OpenStreetMap (`osmnx`)
 
-### 1.2 Análisis exploratorio (EDA)
-- [ ] Distribución de habilitaciones por año, barrio y rubro
-- [ ] Calidad de geocodificación: ¿qué porcentaje tiene coordenadas usables?
-- [ ] Detección de duplicados y registros inconsistentes
-- [ ] Análisis de la estructura de rubros
+### 1.2 Análisis exploratorio
+- [x] Distribución por año, barrio y rubro
+- [x] Geocodificación: el GIS viene en WGS84 nativo, sin geocoding
+- [x] Estructura de rubros
 
-### 1.3 El problema de los rubros (crítico)
-El dataset de CABA usa 843 códigos entre 2015-2018 y 423 desde 2019, sin jerarquía y con múltiples rubros por local.
+### 1.3 El problema de los rubros ✅
+1377 valores, dos nomencladores mezclados. Resuelto: 76 rubros de nivel 2 en 12
+grupos de nivel 1, 93,4% de cobertura, en `referencia/mapeo_rubros.csv`.
 
-- [ ] Construir tabla de mapeo entre nomenclaturas antiguas y nuevas
-- [ ] Definir taxonomía propia de 15-25 categorías operativas
-- [ ] Definir criterio de rubro principal cuando hay varios
-- [ ] Documentar todas las decisiones de mapeo
+En Córdoba cada local tiene un rubro, así que no hizo falta un criterio de rubro
+principal. En CABA sí va a hacer falta.
 
-### 1.4 Definir la variable objetivo
-Este es el punto que define si el proyecto es predictivo o descriptivo.
+### 1.4 La variable objetivo ✅
+Resuelta por el **Plan A**: `fechahabaprobada` y `fechavencimientohab` por
+habilitación. La derivación está validada de forma cruzada contra los conteos
+precalculados de la capa 0 (33,1% vs ~33%). Detalle y limitaciones en
+`CLAUDE.md`.
 
-- [ ] Verificar si el dataset incluye estado, vencimiento o baja
-- [ ] **Plan A:** usar fecha de baja directa si existe
-- [ ] **Plan B:** inferir cierres comparando snapshots anuales (si un local desaparece del padrón, se asume baja)
-- [ ] **Plan C:** cruzar con Google Places API (los locales cerrados quedan marcados)
-- [ ] Documentar limitaciones de la definición elegida
+### Números de la corrida
+| | |
+|---|---|
+| Habilitaciones | 144.743 |
+| Manzanas | 7.533 |
+| Supervivencia de la ciudad | 33,1% |
+| Mediana por manzana | 3 (máximo 657) |
 
-**Entregable:** notebook de EDA + dataset limpio y geocodificado + variable objetivo definida.
+**Entregable:** ✅ pipeline reproducible, dataset limpio y geocodificado,
+variable objetivo definida y validada.
 
 ---
 
@@ -182,7 +210,7 @@ Que una zona tenga muchos cafés exitosos no implica que un café nuevo vaya a f
 - [ ] Documentación automática (OpenAPI)
 
 ### 4.2 Frontend
-- [ ] Mapa interactivo con **Leaflet** o **Mapbox**
+- [ ] Mapa interactivo con **MapLibre GL** (WebGL: son 7.533 polígonos)
 - [ ] Selector de ubicación (click en mapa o búsqueda de dirección)
 - [ ] Selector de rubro
 - [ ] Panel de resultados: score, factores que lo suben, factores que lo bajan
@@ -203,25 +231,28 @@ Que una zona tenga muchos cafés exitosos no implica que un café nuevo vaya a f
 
 ---
 
-## FASE 5 — Expansión a Córdoba (Semanas 16+)
+## FASE 5 — Expansión a CABA (Semanas 16+)
 
-Depende de la respuesta al pedido de información pública.
+La pregunta abierta en CABA es la misma que Córdoba ya resolvió: si el dataset
+de habilitaciones trae estado, vencimiento o fecha de baja.
 
-### Escenario A — Córdoba entrega los datos completos
-- [ ] Adaptar el pipeline a la estructura de datos cordobesa
-- [ ] Reentrenar el modelo
-- [ ] Evaluar **transferibilidad:** ¿el modelo entrenado en CABA predice bien en Córdoba?
+- [ ] Verificar la variable objetivo en BA Data
+- [ ] **Plan B si no hay baja directa:** inferir cierres comparando snapshots anuales
+- [ ] **Plan C:** cruzar con Google Places API
+- [ ] Señal complementaria: inspecciones de la AGC prueban que un local seguía
+  operativo en una fecha dada
+- [ ] Resolver la taxonomía de CABA: 843 códigos entre 2015-2018, 423 desde
+  2019, y varios rubros por local
+- [ ] Adaptar el pipeline y reentrenar
+- [ ] Evaluar **transferibilidad:** ¿el modelo entrenado en Córdoba predice bien
+  en CABA?
 
-### Escenario B — Datos parciales o sin fechas de baja
-- [ ] Aplicar inferencia por snapshots
-- [ ] Complementar con Google Places
-- [ ] Modelo descriptivo + predictivo parcial
+Otra ciudad a considerar: **Posadas** publica renovaciones de habilitación, que
+son prueba directa de supervivencia, geolocalizadas y con actualización diaria.
+Es el dato más limpio de los tres.
 
-### Escenario C — Sin acceso
-- [ ] Construir dataset propio vía scraping de Google Places y portales inmobiliarios
-- [ ] Modelo basado en proxies, con limitaciones documentadas
-
-**Bonus:** si el modelo transfiere bien entre ciudades, eso es un argumento fuerte de escalabilidad — técnico y comercial.
+**Bonus:** si el modelo transfiere bien entre ciudades, eso es un argumento
+fuerte de escalabilidad — técnico y comercial.
 
 ---
 
@@ -229,12 +260,12 @@ Depende de la respuesta al pedido de información pública.
 
 | Capa | Herramientas |
 |---|---|
-| Datos | pandas, geopandas, osmnx, rasterio |
+| Datos | **polars**, geopandas, osmnx, rasterio |
 | Geoespacial | PostGIS, shapely, QGIS (exploración) |
 | ML | scikit-learn, XGBoost, lifelines, SHAP |
 | Satelital | Google Earth Engine, Sentinel Hub |
 | Backend | FastAPI, PostgreSQL + PostGIS |
-| Frontend | React + Leaflet / Mapbox |
+| Frontend | React + MapLibre GL |
 | Orquestación | Prefect o GitHub Actions |
 | Deploy | Docker + Railway / Render |
 
@@ -257,9 +288,8 @@ Depende de la respuesta al pedido de información pública.
 ### Requieren gestión
 | Fuente | Vía |
 |---|---|
-| Habilitaciones Córdoba | Pedido de acceso a información pública / EMFyC |
 | Google Places API | Cuenta de facturación (tier gratuito disponible) |
-| Datos de tráfico histórico | TomTom / HERE (freemium) |
+| Tráfico en tiempo real | TomTom Traffic Flow: 2500 req/día gratis, sin tarjeta |
 
 ---
 
@@ -280,12 +310,12 @@ No esperar a terminar todo para mostrar el trabajo. Cada fase produce algo publi
 
 | Riesgo | Mitigación |
 |---|---|
-| No hay dato de cierres → sin variable objetivo | Planes B y C definidos en Fase 1.4; decidir temprano |
-| Taxonomía de rubros inconsistente | Abordarlo en Fase 1, no dejarlo para el final |
-| Geocodificación deficiente | Evaluar cobertura en EDA; usar geocoder propio si hace falta |
+| ~~No hay dato de cierres~~ | Resuelto en Córdoba por Plan A. Sigue abierto para CABA (Fase 5) |
+| ~~Taxonomía de rubros inconsistente~~ | Resuelto en Córdoba: 1377 → 76 → 12. Sigue abierto para CABA |
+| ~~Geocodificación deficiente~~ | El GIS de Córdoba viene georreferenciado en WGS84 |
 | Confundir correlación con causalidad | Documentar explícitamente; modelar no linealidad de la competencia |
 | Alcance excesivo | Entregar por fases; cada una es autónoma y mostrable |
-| Córdoba no responde | El proyecto ya funciona con CABA; Córdoba es expansión, no dependencia |
+| ~~Córdoba no responde~~ | Resuelto: los datos estaban abiertos, sin trámite |
 
 ---
 
