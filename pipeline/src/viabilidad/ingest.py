@@ -68,17 +68,35 @@ def descargar_historial() -> pl.DataFrame:
     )
 
 
+def _normalizado() -> pl.Expr:
+    """`rubronombre` comparable: minúsculas, sin acentos, espacios colapsados.
+
+    Hace falta porque el campo mezcla dos nomencladores (municipal en Título con
+    acentos, CLANAE en MAYÚSCULAS) y hay entradas que solo difieren en un espacio
+    doble.
+    """
+    expr = pl.col("rubronombre").fill_null("").str.to_lowercase()
+    for acento, plano in config.ACENTOS.items():
+        expr = expr.str.replace_all(acento, plano, literal=True)
+    return expr.str.replace_all(r"\s+", " ").str.strip_chars()
+
+
 def _clasificar_rubro() -> pl.Expr:
     """Mapea el texto libre de `rubronombre` a los rubros del MVP.
 
-    Se evalúa en orden y gana el primer patrón que matchea, así que los rubros
-    más específicos deben ir primero en config.RUBROS.
+    Gana el primer rubro que matchea, así que config.RUBROS va de específico a
+    amplio. Lo que cae en EXCLUSIONES (mayoristas, fábricas, depósitos) sale como
+    "otro" antes de evaluar nada: no son comercios a la calle.
     """
-    nombre = pl.col("rubronombre").fill_null("").str.to_lowercase()
-    expr = pl.when(pl.lit(False)).then(pl.lit(None, dtype=pl.Utf8))
-    for rubro, patrones in config.RUBROS.items():
-        patron = "|".join(patrones)
-        expr = expr.when(nombre.str.contains(patron)).then(pl.lit(rubro))
+    nombre = _normalizado()
+    expr = pl.when(nombre.str.contains(config.EXCLUSIONES)).then(pl.lit("otro"))
+
+    for rubro, reglas in config.RUBROS.items():
+        cond = nombre.str.contains(reglas["incluye"])
+        if excluye := reglas.get("excluye"):
+            cond = cond & ~nombre.str.contains(excluye)
+        expr = expr.when(cond).then(pl.lit(rubro))
+
     return expr.otherwise(pl.lit("otro")).alias("rubro")
 
 

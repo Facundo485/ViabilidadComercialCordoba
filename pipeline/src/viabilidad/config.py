@@ -26,15 +26,53 @@ BBOX_CORDOBA = {"lon_min": -64.35, "lon_max": -64.05, "lat_min": -31.55, "lat_ma
 # Los primeros tres segmentos de nro_catastral ("01-01-001-007") son la manzana.
 LARGO_ID_MANZANA = 9
 
-# Rubros del MVP. Los patrones se matchean contra `rubronombre` en minúsculas.
-# PENDIENTE: ajustar contra la lista real de valores (query groupBy rubronombre).
+# El campo `rubronombre` mezcla dos nomencladores: el municipal viejo (Título,
+# con acentos) y el CLANAE/CIIU nuevo (MAYÚSCULAS). El mismo concepto aparece en
+# ambos, más variantes con doble espacio. Por eso todo se compara normalizado:
+# minúsculas, sin acentos, espacios colapsados.
+
+# Se descartan antes de clasificar: no son comercios a la calle y contaminarían
+# el modelo (un distribuidor mayorista de medicamentos no es una farmacia).
+EXCLUSIONES = r"por mayor|mayorista|fabricacion|reparacion|\bdeposito"
+
+# Rubros del MVP. Se evalúan en orden y gana el primero que matchea, así que los
+# específicos van antes que los amplios. Los patrones son regex sobre el nombre
+# normalizado; \b evita falsos positivos por substring (sin él "bar" matchea
+# "barnices" y una pinturería termina clasificada como cafetería).
 RUBROS = {
-    "cafeteria": ["cafeteria", "cafe", "bar", "confiteria", "restaurante"],
-    "kiosco": ["kiosco", "quiosco", "maxikiosco", "drugstore"],
-    "farmacia": ["farmacia", "perfumeria"],
-    "indumentaria": ["indumentaria", "ropa", "calzado", "textil"],
-    "ferreteria": ["ferreteria", "sanitarios", "pinturer"],
+    "farmacia": {
+        "incluye": r"farmacia|productos farmaceuticos|medicamentos de uso humano",
+        "excluye": r"veterinari|asesoramiento|laboratorio",
+    },
+    "kiosco": {
+        "incluye": r"kiosco|quiosco|polirrubro|drugstore",
+    },
+    "ferreteria": {
+        "incluye": (
+            r"ferreteria|pinturer|\bpinturas\b|\bsanitarios\b"
+            r"|materiales de construccion|herramientas|materiales electricos"
+        ),
+    },
+    "indumentaria": {
+        "incluye": (
+            r"prendas de vestir|prendas y accesorios|indumentaria|calzado"
+            r"|zapateria|zapatilleria|marroquineria|\bropa\b|boutique|lenceria"
+        ),
+    },
+    "cafeteria": {
+        "incluye": (
+            r"\bbar\b|\bbares\b|cafeteria|\bcafes?\b|confiteria|restaurant"
+            r"|cantina|pizzeria|heladeria|cerveceria|lomiteria|empanaderia|parrilla"
+            r"|expendio de comidas|expendio de bebidas|preparacion de comidas"
+            r"|salon de te|casa de te"
+        ),
+        # "productos de confitería" es venta de golosinas, no una confitería.
+        "excluye": r"productos de confiteria|articulos para bar",
+    },
 }
+
+# Para normalizar: polars no trae unicodedata, se hace con un mapa de reemplazo.
+ACENTOS = {"á": "a", "é": "e", "í": "i", "ó": "o", "ú": "u", "ü": "u", "ñ": "n"}
 
 # --- Salidas ----------------------------------------------------------------
 RAIZ = Path(__file__).resolve().parents[3]
