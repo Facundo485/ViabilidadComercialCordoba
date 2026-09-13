@@ -145,3 +145,11 @@ vite.config.ts.timestamp-*
 # Datos descargados
 data/
 *.parquet
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ruff_cache/
+.pytest_cache/
