@@ -37,6 +37,17 @@ Con [uv](https://docs.astral.sh/uv/) es `uv sync && uv run python -m viabilidad 
 
 Comandos sueltos: `ingest` (solo descarga), `manzanas` (solo agrega).
 
+## Tests
+
+```bash
+pip install -e '.[dev]'
+pytest
+```
+
+Mockean el GIS y ejercitan las funciones `descargar_*` enteras, no sus helpers
+sueltos: así se detecta que un paso quedó sin ejecutarse, que es justo lo que un
+test por helper no ve.
+
 Los datos quedan en `data/crudo/` y `data/procesado/` como parquet (sin versionar).
 `rubros` además escribe `referencia/rubros.csv`, que sí se versiona porque es
 el insumo para decidir el mapeo de `config.RUBROS`.

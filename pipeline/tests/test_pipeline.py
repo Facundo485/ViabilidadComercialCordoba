@@ -1,0 +1,120 @@
+"""Tests del pipeline con el GIS mockeado.
+
+La clave es que ejercitan `descargar_*` completas, no sus helpers sueltos: un
+test que llamaba a los helpers por separado no vio que el join de rubros había
+quedado después de un `return` y nunca se ejecutaba.
+"""
+
+from __future__ import annotations
+
+import random
+
+import polars as pl
+import pytest
+
+from viabilidad import arcgis, config, ingest, manzanas
+
+RUBROS_REALES = [
+    "Almacén de comestibles",
+    "VENTA AL POR MENOR DE PRODUCTOS DE ALMACÉN Y DIETÉTICA",
+    "Venta al por menor en farmacias de productos medicinales",
+    "Bar, confiterías, pizzerías, lomiterías, empanaderías, parrilla",
+    "Venta al por menor de pinturas, barnices, lacas, esmaltes",
+    "VENTA AL POR MAYOR DE PRODUCTOS FARMACÉUTICOS",
+    "Depósitos y almacenamientos en general, excepto alimentos",
+]
+
+
+def _falso_gis(monkeypatch, parcelas: list[dict], historial: list[dict]) -> None:
+    def paginar(base, capa, **kw):
+        return iter(parcelas if capa == config.CAPA_PARCELAS else historial)
+
+    monkeypatch.setattr(arcgis, "paginar", paginar)
+
+
+@pytest.fixture
+def datos():
+    random.seed(3)
+    parcelas, historial = [], []
+    for mz in range(1, 40):
+        for p in range(1, random.randint(2, 6)):
+            nro = f"01-01-{mz:03d}-{p:03d}"
+            total = random.randint(1, 5)
+            vig = random.randint(0, total)
+            parcelas.append({
+                "objectid": len(parcelas) + 1, "nro_catastral": nro,
+                "hab_total": total, "hab_vigentes": vig, "hab_novigentes": total - vig,
+                "lon": -64.17 + random.random() / 100, "lat": -31.37 - random.random() / 100,
+                "barrio_identificado": "AYACUCHO", "cpc_identificado": "CENTRO AMERICA",
+            })
+            for _ in range(total):
+                historial.append({
+                    "objectid": len(historial) + 1, "nro_catastral": nro,
+                    "rubronombre": random.choice(RUBROS_REALES),
+                    "vigente": random.randint(0, 1),
+                    "fechahabaprobada": 1_600_000_000_000,
+                    "fechavencimientohab": 1_700_000_000_000,
+                })
+    return parcelas, historial
+
+
+def test_historial_trae_los_rubros_clasificados(monkeypatch, datos):
+    """Regresión: el join contra el mapeo quedaba después de un return."""
+    _falso_gis(monkeypatch, *datos)
+    df = ingest.descargar_historial()
+
+    assert {"nivel1", "nivel2", "manzana"} <= set(df.columns)
+    assert df["nivel2"].null_count() == 0
+    assert df.filter(pl.col("nivel2") != "otro").height > 0, "no clasificó nada"
+
+
+def test_las_fechas_se_convierten(monkeypatch, datos):
+    _falso_gis(monkeypatch, *datos)
+    df = ingest.descargar_historial()
+    assert isinstance(df.schema["fechahabaprobada"], pl.Datetime)
+    assert df["fechahabaprobada"].dt.year().min() == 2020
+
+
+def test_se_descartan_las_coordenadas_corruptas(monkeypatch, datos):
+    """La capa declara un extent hasta lat 90: hay puntos fuera de Córdoba."""
+    parcelas, historial = datos
+    basura = dict(parcelas[0], objectid=99_999, nro_catastral="99-99-999-999", lat=89.9, lon=179.9)
+    _falso_gis(monkeypatch, [*parcelas, basura], historial)
+
+    df = ingest.descargar_parcelas()
+    assert 99_999 not in df["objectid"].to_list()
+
+
+def test_la_manzana_sale_del_nro_catastral(monkeypatch, datos):
+    _falso_gis(monkeypatch, *datos)
+    df = ingest.descargar_parcelas()
+    assert df.filter(pl.col("nro_catastral") == "01-01-001-001")["manzana"][0] == "01-01-001"
+
+
+def test_la_agregacion_no_pierde_habilitaciones(monkeypatch, datos):
+    _falso_gis(monkeypatch, *datos)
+    parcelas = ingest.descargar_parcelas()
+    historial = ingest.descargar_historial()
+
+    mz = manzanas.agregar(parcelas, historial)
+
+    assert mz["hab_total"].sum() == parcelas["hab_total"].sum()
+    assert mz["manzana"].n_unique() == len(mz)
+    assert (mz["hab_total"] == mz["hab_vigentes"] + mz["hab_novigentes"]).all()
+
+
+def test_los_mayoristas_quedan_fuera_del_detalle(monkeypatch, datos):
+    _falso_gis(monkeypatch, *datos)
+    detalle = manzanas.por_rubro(ingest.descargar_historial())
+
+    assert "industria y deposito" not in detalle["nivel1"].unique().to_list()
+    assert detalle["tasa_supervivencia"].is_between(0, 1).all()
+
+
+def test_el_suavizado_baja_las_tasas_perfectas_de_poco_volumen(monkeypatch, datos):
+    _falso_gis(monkeypatch, *datos)
+    detalle = manzanas.por_rubro(ingest.descargar_historial())
+
+    perfectas = detalle.filter((pl.col("tasa_cruda") == 1.0) & (pl.col("total") <= 2))
+    assert len(perfectas) > 0, "el fixture no generó el caso"
+    assert (perfectas["tasa_supervivencia"] < 1.0).all()

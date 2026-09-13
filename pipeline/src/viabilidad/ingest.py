@@ -62,7 +62,7 @@ def descargar_historial() -> pl.DataFrame:
     )
     df = _a_fecha(pl.DataFrame(filas), FECHAS_HISTORIAL)
 
-    return df.with_columns(
+    df = df.with_columns(
         pl.col("nro_catastral").str.slice(0, config.LARGO_ID_MANZANA).alias("manzana")
     )
     return _con_rubro(df)
@@ -80,9 +80,18 @@ def _con_rubro(df: pl.DataFrame) -> pl.DataFrame:
         raise FileNotFoundError(
             f"Falta {ruta}. Corré `python -m viabilidad mapeo` para generarlo."
         )
-    tabla = pl.read_csv(ruta).select("rubronombre", "nivel2", "nivel1")
+    # Se une por el nombre normalizado y no por el crudo: el nomenclador tiene
+    # entradas que solo difieren en un espacio doble, y un join exacto las perdería.
+    tabla = (
+        pl.read_csv(ruta)
+        .with_columns(mapeo.normalizar().alias("_clave"))
+        .select("_clave", "nivel2", "nivel1")
+        .unique(subset="_clave", keep="first")
+    )
 
-    unido = df.join(tabla, on="rubronombre", how="left")
+    unido = df.with_columns(mapeo.normalizar().alias("_clave")).join(
+        tabla, on="_clave", how="left"
+    )
     if huerfanos := unido.filter(pl.col("nivel2").is_null()).height:
         log.warning(
             "%s habilitaciones con un rubro que no está en el mapeo (quedan en 'otro'). "
@@ -91,7 +100,7 @@ def _con_rubro(df: pl.DataFrame) -> pl.DataFrame:
         )
     return unido.with_columns(
         pl.col("nivel2").fill_null("otro"), pl.col("nivel1").fill_null("otro")
-    )
+    ).drop("_clave")
 
 
 def ejecutar() -> tuple[pl.DataFrame, pl.DataFrame]:
