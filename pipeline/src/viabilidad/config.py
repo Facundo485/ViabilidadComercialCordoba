@@ -35,11 +35,12 @@ LARGO_ID_MANZANA = 9
 ACENTOS = {"á": "a", "é": "e", "í": "i", "ó": "o", "ú": "u", "ü": "u", "ñ": "n"}
 
 # --- Salidas ----------------------------------------------------------------
-RAIZ = Path(__file__).resolve().parents[3]
+# Todo cuelga de pipeline/, no de la raíz del repo.
+RAIZ = Path(__file__).resolve().parents[2]
 DIR_DATOS = RAIZ / "data"
 DIR_CRUDO = DIR_DATOS / "crudo"
 DIR_PROCESADO = DIR_DATOS / "procesado"
 
 # Tablas de referencia chicas que sí se versionan: son el insumo para decidir
 # el mapeo de rubros y conviene verlas en el diff cuando cambian.
-DIR_REFERENCIA = Path(__file__).resolve().parents[2] / "referencia"
+DIR_REFERENCIA = RAIZ / "referencia"
