@@ -38,6 +38,17 @@ está bajo el dedo con una grilla espacial: probar las 19.600 en cada movimiento
 sería inviable, así que la grilla deja dos o tres candidatas y recién ahí va el
 test exacto de punto en polígono.
 
+## Para probarlo local
+
+Hay una config en `.claude/launch.json`, o a mano:
+
+```bash
+cp ../pipeline/data/procesado/datos.js .
+python3 -m http.server 8777 --directory .
+```
+
+`datos.js` dentro de `mapa/` está gitignoreado: es una copia de trabajo.
+
 ## Qué muestra y qué no
 
 El score es la probabilidad de que un comercio de ese rubro abierto hoy en esa

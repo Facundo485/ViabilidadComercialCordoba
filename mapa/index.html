@@ -1,3 +1,4 @@
+<meta charset="utf-8">
 <title>Viabilidad Comercial Córdoba</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -533,6 +534,11 @@ h1 {
   }
 
   var vista = { s: 1, tx: 0, ty: 0 };
+  // Los límites del zoom se derivan de la escala que encuadra la ciudad, no de
+  // constantes: dependen del tamaño del lienzo y de las unidades de mundo, y
+  // puestos a ojo quedaron por debajo del encuadre inicial — el primer gesto
+  // de acercar alejaba, y de ahí no se movía más.
+  var sAjuste = 1;
   var ancho = 0, alto = 0, dpr = 1;
 
   function medir() {
@@ -547,6 +553,7 @@ h1 {
 
   function encuadrar() {
     var s = Math.min(ancho / (maxX - minX), alto / (maxY - minY)) * 0.96;
+    sAjuste = s;
     vista.s = s;
     vista.tx = (ancho - (maxX - minX) * s) / 2 - minX * s;
     vista.ty = (alto - (maxY - minY) * s) / 2 - minY * s;
@@ -570,7 +577,7 @@ h1 {
         var f = manzanas[i];
         ctx.fillStyle = f.s ? color(f.s[idx]) : sinDatos;
         ctx.fill(f.path);
-        if (vista.s > 0.0008) ctx.stroke(f.path);
+        if (vista.s > sAjuste * 0.9) ctx.stroke(f.path);
       }
       var sel = fijada || resaltada;
       if (sel) {
@@ -658,9 +665,18 @@ h1 {
   function soltarPuntero(e) {
     punteros.delete(e.pointerId);
     if (punteros.size < 2) pinza = null;
+    if (punteros.size === 1) {
+      // Se levantó un dedo del pellizco: el que queda retoma el arrastre, si no
+      // hay que soltar y volver a apoyar para poder mover el mapa.
+      var q = punteros.values().next().value;
+      arrastre = { x: q.x, y: q.y };
+      movido = 99;
+    }
     if (punteros.size === 0) {
       // Un toque corto es una selección; uno largo fue un arrastre.
-      if (arrastre && movido < 8) {
+      // 14 y no 8: un dedo tiembla, y con el umbral muy bajo el toque se
+      // interpretaba como arrastre y no seleccionaba nada.
+      if (arrastre && movido < 14) {
         var f = enPunto(e.offsetX, e.offsetY);
         fijada = (f && fijada && fijada.m === f.m) ? null : f;
         resaltada = null;
@@ -680,7 +696,7 @@ h1 {
   });
 
   function zoom(factor, cx, cy) {
-    var nuevo = Math.max(0.00005, Math.min(vista.s * factor, 0.05));
+    var nuevo = Math.max(sAjuste * 0.6, Math.min(vista.s * factor, sAjuste * 60));
     factor = nuevo / vista.s;
     vista.tx = cx - (cx - vista.tx) * factor;
     vista.ty = cy - (cy - vista.ty) * factor;
