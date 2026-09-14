@@ -7,6 +7,8 @@ dependencies = [
     "polars>=1.0",
     "requests>=2.31",
     "lifelines>=0.30",
+    "scipy>=1.11",          # cKDTree para los vecinos del entorno
+    "scikit-learn>=1.4",    # el clasificador binario de la validación
 ]
 
 [project.optional-dependencies]

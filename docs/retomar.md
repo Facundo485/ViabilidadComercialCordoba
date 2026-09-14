@@ -14,7 +14,9 @@ Paso 1  [OK]         La tasa vieja medía la época, no la supervivencia. Confir
 Paso 2  [OK]         Renovaciones encadenadas con el titular de la vista.
 Paso 2b [OK]         Estratificado por cohorte: el efecto de rubro existe y es
                      estable entre cohortes independientes (rho 0,68).
-Paso 3  [LIBRE]      Features. Ya se puede empezar.                          <-- acá
+Paso 3  [A MEDIAS]   Features hechas. El entorno separa lugares dentro de un
+                     período (AUC 0,60 -> 0,66) pero casi no predice hacia
+                     adelante (+0,006). Ver abajo.                           <-- acá
 Places  [OK]         Proxy calibrado: 61,0% de exactitud contra 55,3% de base.
                      Tiene señal real, pero es ruidoso. Ver abajo.
 ```
@@ -268,6 +270,72 @@ Tres cosas que costó descubrir y conviene no repetir:
 
 **Qué implica.** El modelo tiene techo. El score va agregado a manzana y rubro,
 donde el ruido promedia, y la limitación se declara junto al número.
+
+---
+
+## Paso 3: las features del entorno, y el resultado que gobierna todo
+
+`python -m viabilidad features` calcula, para cada período, qué había alrededor
+**el día que abrió**: densidad comercial y competencia del mismo rubro a 100,
+300 y 500 m, entropía de Shannon sobre los rubros vecinos, historial de cierres
+de la zona y antigüedad comercial. 62.556 períodos en 20 segundos.
+
+**La regla que ordena el módulo es que nada mire hacia adelante.** Un local que
+abrió en 2016 solo ve el entorno de 2016. Hay tests que lo fijan; es el modo de
+falla que mejoraría las métricas y arruinaría el producto.
+
+Dos features salieron midiendo el calendario y hubo que corregirlas:
+`antiguedad_zona_anios` correlacionaba **0,986** con el año de alta y
+`cierres_previos_zona` **0,925**. No describían la zona sino la ventana de
+observación: el histórico arranca en 2014, así que un local de ese año ve cero
+predecesores terminados por construcción. Se arreglaron restándoles la media de
+su cohorte de alta, que es donde sí hay señal de lugar.
+
+### El modelo es binario, no de duración
+
+El 55% de los períodos dura exactamente 5,0 años. Con más de la mitad de los
+pares empatados, el C-index de un Cox no puede discriminar: dio **0,507** aunque
+los coeficientes fueran significativos. Lo que separa a un comercio de otro es
+binario —renovó o no—, así que se modela así y se mide con AUC.
+
+El Cox igual sirvió para ver direcciones, y dos features salieron significativas
+y en el sentido esperado: más cierres previos en la zona que el promedio de su
+cohorte sube el riesgo (HR 1,66, p=0,004) y más antigüedad comercial lo baja
+(p=0,0002). Densidad, competencia y entropía no dieron significativas.
+
+### Los dos números, y por qué hay que reportar el peor
+
+`python -m viabilidad modelo`:
+
+```
+ESPACIAL (barrios no vistos, mismo período)   solo rubro  ->  rubro+entorno
+  5 splits                                      0,595          0,669   (+0,072)
+
+TEMPORAL (altas posteriores, el uso real)     solo rubro  ->  rubro+entorno
+  train<=2016, test 2017-2021                   0,582          0,592
+  train<=2017, test 2018-2021                   0,571          0,573
+  train<=2018, test 2019-2021                   0,560          0,565   (+0,006)
+```
+
+**El entorno separa lugares dentro de un período, pero no predice hacia
+adelante.** En el corte espacial train y test comparten la época, así que el
+modelo se apoya en regularidades de ese período que no son estables. No es fuga
+de la variable objetivo, pero es optimismo: reportar solo el 0,669 sería vender
+una capacidad que el modelo no tiene.
+
+Y el producto necesita justamente la extrapolación temporal: alguien parado hoy
+frente a un local vacío pregunta por el futuro, no por otro barrio.
+
+### Qué sigue, entonces
+
+1. **Sumar features estructurales**, que es lo que falta y lo que debería
+   transferir mejor en el tiempo: zonificación (dataset `3011`), población por
+   radio censal (INDEC 2022), red vial y POIs (OSM). Las que tenemos hoy salen
+   todas del mismo churn comercial, que es justamente lo que cambia de período
+   a período.
+2. **Revisar el techo.** El objetivo tiene 61% de exactitud medida; parte de
+   este 0,57 es ruido del target y no falta de señal. Conviene estimar cuánto.
+3. No tocar el corte temporal para que dé mejor. Es el número honesto.
 
 ---
 

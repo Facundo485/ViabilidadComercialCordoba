@@ -42,15 +42,40 @@ el mapa y decir "esa esquina no da" es un número que nadie audita.
 
 ## Decisiones técnicas críticas
 
-### 1. Validación espacial, no aleatoria
+### 1. Validación espacial, no aleatoria — y la temporal manda
 Los locales vecinos están espacialmente autocorrelacionados. Un split aleatorio deja vecinos en train y test simultáneamente, inflando las métricas de forma engañosa.
 
 **Regla:** particionar por barrio/comuna. Además, validación temporal (entrenar con años anteriores a un corte, testear con posteriores).
 
-### 2. Análisis de supervivencia, no clasificación binaria
-Un local abierto hace 6 meses que sigue activo no es "éxito" ni "fracaso" — es un **dato censurado a la derecha**.
+**Y las dos no miden lo mismo.** Medido: el entorno aporta **+0,072** de AUC en
+el corte espacial y **+0,006** en el temporal. En el espacial, train y test
+comparten la época, así que el modelo se apoya en regularidades de ese período
+que no son estables hacia adelante — no es fuga del objetivo, pero es optimismo.
+El producto necesita la extrapolación temporal: alguien parado hoy frente a un
+local vacío pregunta por el futuro, no por otro barrio. **Reportar siempre el
+número temporal; el espacial solo, engaña.**
 
-**Regla:** usar Kaplan-Meier y modelos de Cox (`lifelines`) como enfoque principal. XGBoost puede complementar, pero no debe ser el único modelo: no maneja censura correctamente.
+### 1b. Nada de lo que describe el entorno puede mirar hacia adelante
+Un local que abrió en 2016 solo puede ver el comercio que existía en 2016.
+Calcular la competencia sobre el dataset entero mete el futuro en la variable
+explicativa: la métrica mejora y el score deja de servir. Hay tests que lo fijan
+en `test_features.py`.
+
+Cuidado además con las features que parecen del lugar y son del calendario: la
+antigüedad comercial de la zona correlacionaba 0,986 con el año de alta, porque
+el histórico arranca en 2014 y un local de ese año ve cero predecesores por
+construcción. Se corrigen restando la media de la cohorte de alta.
+
+### 2. Supervivencia para entender, binario para predecir
+Un local abierto hace 6 meses que sigue activo no es "éxito" ni "fracaso" — es un **dato censurado a la derecha**, y eso no se negocia: nunca rellenar la censura como cierre.
+
+**Pero el C-index no sirve acá.** El 55% de los períodos dura exactamente 5,0
+años, que es el plazo del permiso: con más de la mitad de los pares empatados,
+un Cox da concordancia 0,507 aunque tenga coeficientes significativos.
+
+**Regla:** Kaplan-Meier y Cox (`lifelines`) para entender direcciones y
+magnitudes; el modelo que predice es **binario** —renovó o no, medido con AUC—
+sobre los locales que tuvieron la oportunidad de renovar (alta hasta 2021).
 
 ### 3. La competencia no es lineal
 Pocos competidores puede indicar mercado inexistente; muchos, saturación; un nivel intermedio suele reflejar aglomeración beneficiosa (clusters que atraen demanda).
@@ -308,6 +333,9 @@ React/
     │   ├── supervivencia.py   # Kaplan-Meier sobre períodos de actividad
     │   ├── cohortes.py        # el mismo KM estratificado por cohorte de alta
     │   ├── validacion.py      # muestra para calibrar el proxy contra Places
+    │   ├── places.py         # consulta Places y calibra
+    │   ├── features.py       # entorno comercial, medido a la fecha de alta
+    │   ├── modelo.py         # validación espacial y temporal
     │   └── cli.py
     └── tests/
 ```
@@ -315,8 +343,7 @@ React/
 Difiere de la estructura genérica que proponía el roadmap (`src/ingest`,
 `src/features`, `data/raw|interim|processed`). Se mantiene esta: los módulos
 están separados por etapa igual, con nombres del dominio y en español como el
-resto del proyecto. Cuando aparezcan las features y el modelo van como
-`features.py` y `modelo.py` en el mismo paquete.
+resto del proyecto. Las features y el modelo están en `features.py` y `modelo.py`.
 
 `pipeline/` queda como un proyecto Python instalable aparte, para que el backend
 y el frontend puedan sumarse como carpetas hermanas sin mezclarse.
@@ -329,6 +356,9 @@ python -m viabilidad diagnostico     # ¿la tasa mide el nomenclador? (no necesi
 python -m viabilidad supervivencia   # Kaplan-Meier por rubro (necesita ingest previo)
 python -m viabilidad cohortes        # Paso 2b: estratificado por cohorte de alta
 python -m viabilidad muestra         # muestra para calibrar el proxy contra Places
+python -m viabilidad places          # consulta Places (usa cache, no re-factura)
+python -m viabilidad features        # entorno comercial a la fecha de alta
+python -m viabilidad modelo          # ¿el entorno predice? validación espacial y temporal
 ```
 
 ## Convenciones

@@ -12,9 +12,11 @@ from . import (
     cohortes,
     config,
     diagnostico,
+    features,
     ingest,
     manzanas,
     mapeo,
+    modelo,
     places,
     resumen,
     supervivencia,
@@ -75,6 +77,11 @@ def cmd_supervivencia(_) -> None:
     supervivencia.ejecutar()
 
 
+def cmd_features(_) -> None:
+    """Features del entorno comercial, medidas en la fecha de alta de cada local."""
+    features.ejecutar()
+
+
 def cmd_cohortes(_) -> None:
     """Paso 2b: supervivencia por cohorte de alta, para separar rubro de época."""
     cohortes.ejecutar()
@@ -83,6 +90,11 @@ def cmd_cohortes(_) -> None:
 def cmd_muestra(_) -> None:
     """Muestra para calibrar el proxy de cierre contra Google Places."""
     validacion.ejecutar()
+
+
+def cmd_modelo(_) -> None:
+    """¿El entorno predice supervivencia? Validación espacial y temporal."""
+    modelo.ejecutar()
 
 
 def cmd_places(args) -> None:
@@ -118,7 +130,9 @@ COMANDOS = {
     "diagnostico": cmd_diagnostico,
     "supervivencia": cmd_supervivencia,
     "cohortes": cmd_cohortes,
+    "features": cmd_features,
     "muestra": cmd_muestra,
+    "modelo": cmd_modelo,
     "places": cmd_places,
     "todo": cmd_todo,
 }
