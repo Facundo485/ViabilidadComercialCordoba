@@ -170,6 +170,15 @@ h1 {
   top: 16px; right: 16px; width: 252px; padding: 14px 16px;
 }
 #ficha[hidden] { display: none; }
+/* Solo en teléfono: en escritorio la ficha se va sola al sacar el mouse. */
+#cerrar {
+  display: none;
+  position: absolute; top: 8px; right: 8px;
+  width: 30px; height: 30px; place-items: center;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px;
+  color: var(--ink-soft); font-size: 18px; line-height: 1; cursor: pointer;
+}
+#cerrar:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 .mz {
   font-family: "IBM Plex Mono", ui-monospace, monospace;
   font-size: 15px; font-weight: 600; letter-spacing: .02em;
@@ -201,6 +210,17 @@ h1 {
 #pie b { color: var(--ink); font-weight: 600; }
 #pie p { margin: 0; }
 #pie p + p { margin-top: 5px; }
+#pie summary {
+  cursor: pointer; list-style: none;
+  font-size: 10px; font-weight: 600;
+  letter-spacing: .1em; text-transform: uppercase;
+  color: var(--ink-faint);
+}
+#pie summary::-webkit-details-marker { display: none; }
+#pie summary::after { content: " ▾"; }
+#pie[open] summary { margin-bottom: 7px; }
+#pie[open] summary::after { content: " ▴"; }
+#pie summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: 3px; }
 
 #hint {
   position: absolute; left: 50%; top: 18px; transform: translateX(-50%);
@@ -223,12 +243,57 @@ h1 {
   #pie { font-size: 10.5px; padding: 9px 12px; max-width: none; }
   #hint { display: none; }
 }
+/* Teléfono. No es el layout de escritorio apretado: en un touch no hay hover,
+   así que la ficha tiene que aparecer sobre el mapa al tocar —y no debajo, fuera
+   de pantalla— y el rubro se elige con chips horizontales en vez de una lista
+   que se comería media pantalla. */
 @media (max-width: 620px) {
-  body { overflow: auto; height: auto; }
-  #map { position: relative; height: 58dvh; }
-  .panel { position: relative; inset: auto; width: auto; margin: 10px; box-shadow: none; }
-  #rail { max-height: none; }
-  #ficha[hidden] { display: none; }
+  #map { position: absolute; inset: 0; }
+
+  #rail {
+    top: 8px; left: 8px; right: 8px; width: auto;
+    max-height: none; overflow: visible;
+  }
+  #rail > * { padding: 9px 12px; }
+  h1 { font-size: 14px; }
+  .sub, #rail > div:last-child .nota-escala, .sin-datos-nota { display: none; }
+
+  /* Los rubros pasan a una fila que se desliza. `flex: none` para que no
+     estire el rail, y sin scrollbar visible. */
+  #rubros {
+    display: flex; flex: none; gap: 6px;
+    overflow-x: auto; overflow-y: hidden;
+    min-height: 0; padding: 8px 10px;
+    scrollbar-width: none;
+  }
+  #rubros::-webkit-scrollbar { display: none; }
+  #rubros .eyebrow { display: none; }
+  .rubro {
+    width: auto; flex: none; gap: 6px;
+    grid-template-columns: auto auto;
+    padding: 6px 10px; border: 1px solid var(--line); border-radius: 999px;
+    white-space: nowrap; font-size: 12.5px;
+  }
+  .escala-ejes { font-size: 10px; }
+
+  /* Ficha como hoja inferior, encima del mapa. */
+  #ficha {
+    top: auto; bottom: 8px; left: 8px; right: 8px; width: auto;
+    padding: 12px 14px;
+  }
+  .gran-num { font-size: 30px; }
+
+  /* Las limitaciones siguen disponibles, plegadas: en 6 líneas tapaban el mapa
+     entero. El resumen dice qué hay adentro para que no sea un botón mudo. */
+  #pie {
+    left: 8px; right: 8px; bottom: 8px; max-width: none;
+    padding: 9px 12px; font-size: 11px;
+  }
+  #pie[open] { max-height: 52dvh; overflow-y: auto; }
+  /* Los dos viven en el borde inferior, así que no conviven: mientras hay una
+     manzana elegida manda la ficha, que se cierra con su propio botón. */
+  #ficha:not([hidden]) ~ #pie { display: none; }
+  #cerrar { display: grid; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
@@ -257,6 +322,7 @@ h1 {
 </section>
 
 <aside class="panel" id="ficha" hidden>
+  <button id="cerrar" type="button" aria-label="Cerrar la ficha">×</button>
   <div class="mz" id="fMz"></div>
   <div class="barrio" id="fBarrio"></div>
   <div class="gran-num"><span id="fScore"></span><small>%</small></div>
@@ -268,10 +334,11 @@ h1 {
   </dl>
 </aside>
 
-<footer class="panel" id="pie">
+<details class="panel" id="pie" open>
+  <summary>Cómo leer esto, y qué no dice</summary>
   <p><b>Esto no predice si un local va a cerrar.</b> El objetivo es un proxy —renovó o no el permiso— calibrado contra Google Places: 61&nbsp;% de exactitud, lo que pone un techo de AUC 0,608 que ninguna variable rompe. Por eso el número va agregado a manzana y rubro, donde el ruido promedia, y nunca como veredicto sobre una dirección.</p>
   <p><b>Es predictivo, no causal</b>, y describe el presente: seis hipótesis de trayectoria dieron nulo, así que no dice qué zona va a mejorar. Manzanas sin aperturas recientes se describen con datos más viejos.</p>
-</footer>
+</details>
 
 <script>
 (function () {
@@ -416,6 +483,19 @@ h1 {
   }
   document.getElementById("nSinDatos").textContent =
     (feats.length - conScore.length).toLocaleString("es-AR");
+
+  function soltar() {
+    fijada = null;
+    map.setFilter("resalte", ["==", ["get", "m"], ""]);
+    ficha.hidden = true;
+  }
+  document.getElementById("cerrar").addEventListener("click", soltar);
+
+  // En un teléfono las limitaciones plegadas dejan ver el mapa; en escritorio
+  // hay lugar de sobra y van abiertas, que es donde corresponde que estén.
+  if (window.matchMedia("(max-width: 620px)").matches) {
+    document.getElementById("pie").open = false;
+  }
 
   // ---- ficha ----
   var ficha = document.getElementById("ficha");
