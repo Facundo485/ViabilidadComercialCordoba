@@ -359,17 +359,35 @@ h1 {
 <script>
 (function () {
   "use strict";
+
   var aviso = document.getElementById("aviso");
+  function avisar(texto) { aviso.textContent = texto; aviso.hidden = false; }
+
+  // Cualquier excepción que se escape termina en pantalla. Sin esto la página
+  // se queda en blanco y no hay forma de saber qué pasó: ya costó dos rondas.
+  window.addEventListener("error", function (e) {
+    avisar("Se rompió algo al dibujar el mapa: " + (e.message || e.type));
+  });
+
   var D = window.DATOS;
   if (!D || !D.manzanas) {
-    // Quedarse en blanco es peor que avisar. Ya pasó dos veces: una por no
-    // enlazar datos.js, y otra por poner el aviso en un elemento que en
-    // teléfono estaba oculto, así que no se enteraba nadie.
-    aviso.textContent = "No se cargaron los datos del mapa. Probá recargar.";
-    aviso.hidden = false;
+    avisar("No se cargaron los datos del mapa. Probá recargar.");
     return;
   }
   var rubros = D.rubros;
+
+  var NOMBRES = {
+    almacen: "Almacén", bar_restaurante: "Bar y restaurante", bebidas: "Bebidas",
+    bijouterie: "Bijouterie y joyería", calzado: "Calzado", carniceria: "Carnicería",
+    comercio_otros: "Comercio general", fabricacion: "Fabricación",
+    juegos_azar: "Juegos de azar", oficina: "Oficina y servicios",
+    otro: "Otros rubros", ropa: "Indumentaria"
+  };
+  function nombre(r) { return NOMBRES[r] || r; }
+  function pct(mil) { return (mil / 10).toFixed(1); }
+  function css(v) {
+    return getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+  }
 
   // Las coordenadas llegan como enteros delta contra el vértice anterior.
   // Reconstruirlas acá es lo que permite que el archivo pese 1,9 MB en vez de
@@ -389,121 +407,55 @@ h1 {
     };
   });
   var coleccion = { type: "FeatureCollection", features: feats };
-  aviso.hidden = true;
-
-  var NOMBRES = {
-    almacen: "Almacén", bar_restaurante: "Bar y restaurante", bebidas: "Bebidas",
-    bijouterie: "Bijouterie y joyería", calzado: "Calzado", carniceria: "Carnicería",
-    comercio_otros: "Comercio general", fabricacion: "Fabricación",
-    juegos_azar: "Juegos de azar", oficina: "Oficina y servicios",
-    otro: "Otros rubros", ropa: "Indumentaria"
-  };
-  var nombre = function (r) { return NOMBRES[r] || r; };
-
-  // Estadística por rubro: promedio y cortes de la escala. Se calcula acá y no
-  // en el pipeline para que la escala siempre use contraste real del rubro
-  // elegido en vez de un rango fijo que aplaste a los rubros parejos.
   var conScore = feats.filter(function (f) { return f.properties.s; });
 
+  // Estadística por rubro: promedio y cortes de la escala. Se calcula acá y no
+  // en el pipeline para que la escala use el contraste real del rubro elegido
+  // en vez de un rango fijo que aplaste a los rubros parejos.
   var stats = rubros.map(function (_, i) {
-    var v = conScore.map(function (f) { return f.properties.s[i]; }).sort(function (a, b) { return a - b; });
-    var q = function (p) { return v[Math.min(v.length - 1, Math.floor(p * v.length))]; };
-    var suma = 0; for (var k = 0; k < v.length; k++) suma += v[k];
+    var v = conScore.map(function (f) { return f.properties.s[i]; })
+      .sort(function (a, b) { return a - b; });
+    function q(p) { return v[Math.min(v.length - 1, Math.floor(p * v.length))]; }
+    var suma = 0;
+    for (var k = 0; k < v.length; k++) suma += v[k];
     return { orden: v, media: suma / v.length, p05: q(0.05), p50: q(0.5), p95: q(0.95) };
   });
 
   var idx = 0;
   var fijada = null;
+  var map = null;
+  var ficha = document.getElementById("ficha");
+  var hint = document.getElementById("hint");
 
-  var pct = function (mil) { return (mil / 10).toFixed(1); };
+  // ------------------------------------------------------------------
+  // La interfaz se arma ANTES del mapa, y no es un detalle de orden: el
+  // constructor de MapLibre necesita WebGL y tira si el navegador no lo tiene.
+  // Estando después, una excepción ahí dejaba los paneles vacíos y sin
+  // explicación — que fue exactamente el bug en el teléfono.
+  // ------------------------------------------------------------------
 
-  var map = new maplibregl.Map({
-    container: "map",
-    style: { version: 8, sources: {}, layers: [] },
-    center: [-64.19, -31.41], zoom: 11.4, minZoom: 9.5, maxZoom: 16,
-    attributionControl: false, dragRotate: false
-  });
-  map.touchZoomRotate.disableRotation();
-
-  function colorExpr() {
-    var s = stats[idx];
-    var valor = ["at", idx, ["get", "s"]];
-    // Las manzanas sin historia comercial van en neutro. Son 12.708 de 19.600,
-    // así que sin este caso el mapa queda lleno de agujeros y Córdoba parece un
-    // archipiélago.
-    return ["case", ["has", "s"],
-      ["interpolate", ["linear"], valor,
-        s.p05, css("--s1"), (s.p05 + s.p50) / 2, css("--s2"),
-        s.p50, css("--s3"),
-        (s.p50 + s.p95) / 2, css("--s4"), s.p95, css("--s5")],
-      css("--sin-datos")];
-  }
-  function css(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
-
-  map.on("load", function () {
-    map.addSource("mz", { type: "geojson", data: coleccion });
-    map.addLayer({
-      id: "manzanas", type: "fill", source: "mz",
-      paint: { "fill-color": colorExpr(), "fill-opacity": 0.92 }
-    });
-    map.addLayer({
-      id: "bordes", type: "line", source: "mz",
-      paint: { "line-color": css("--ground"), "line-width": 0.5, "line-opacity": 0.55 }
-    });
-    map.addLayer({
-      id: "resalte", type: "line", source: "mz",
-      filter: ["==", ["get", "m"], ""],
-      paint: { "line-color": css("--ink"), "line-width": 2 }
-    });
-    encuadrar();
-    pintar();
-  });
-
-  function encuadrar() {
-    map.fitBounds([[-64.32, -31.52], [-64.07, -31.29]], { padding: 24, duration: 0 });
-  }
-
-  // MapLibre dimensiona su canvas una sola vez, al crearse. El artifact vive en
-  // un panel que el lector agranda y achica a voluntad, así que sin esto el mapa
-  // queda del tamaño que tenía el contenedor en el primer frame — que fue
-  // exactamente el bug: una miniatura en la esquina.
-  var tocado = false;
-  map.on("dragstart", function () { tocado = true; });
-  map.on("zoomstart", function (e) { if (e.originalEvent) tocado = true; });
-
-  if (window.ResizeObserver) {
-    var pendiente;
-    new ResizeObserver(function () {
-      clearTimeout(pendiente);
-      pendiente = setTimeout(function () {
-        map.resize();
-        // Reencuadrar solo mientras el lector no haya movido el mapa: después
-        // de eso, saltarle la vista al redimensionar el panel es una molestia.
-        if (!tocado) encuadrar();
-      }, 120);
-    }).observe(document.getElementById("map"));
-  }
-
-  // ---- selector ----
   var cont = document.getElementById("rubros");
   rubros.forEach(function (r, i) {
     var b = document.createElement("button");
-    b.className = "rubro"; b.type = "button";
+    b.className = "rubro";
+    b.type = "button";
     b.setAttribute("aria-pressed", i === idx ? "true" : "false");
-    b.innerHTML = '<span>' + nombre(r) + '</span><span class="pct">' + pct(stats[i].media) + '%</span>';
+    b.innerHTML = '<span>' + nombre(r) + '</span><span class="pct">' +
+      pct(stats[i].media) + '%</span>';
     b.addEventListener("click", function () {
       idx = i;
       cont.querySelectorAll(".rubro").forEach(function (o, j) {
         o.setAttribute("aria-pressed", j === i ? "true" : "false");
       });
-      if (map.getLayer("manzanas")) map.setPaintProperty("manzanas", "fill-color", colorExpr());
-      pintar();
+      if (map && map.getLayer("manzanas")) {
+        map.setPaintProperty("manzanas", "fill-color", colorExpr());
+      }
+      pintarLeyenda();
       if (fijada) mostrar(fijada);
     });
     cont.appendChild(b);
   });
 
-  // ---- leyenda ----
   var escala = document.getElementById("escala");
   ["--s1", "--s2", "--s3", "--s4", "--s5"].forEach(function (v) {
     var sp = document.createElement("span");
@@ -511,19 +463,23 @@ h1 {
     escala.appendChild(sp);
   });
 
-  function pintar() {
+  function pintarLeyenda() {
     var s = stats[idx];
     document.getElementById("ejeMin").textContent = pct(s.p05) + "%";
     document.getElementById("ejeMed").textContent = pct(s.p50) + "%";
     document.getElementById("ejeMax").textContent = pct(s.p95) + "%";
     document.getElementById("promRubro").textContent = pct(s.media) + "%";
   }
+  pintarLeyenda();
+
   document.getElementById("nSinDatos").textContent =
     (feats.length - conScore.length).toLocaleString("es-AR");
 
   function soltar() {
     fijada = null;
-    map.setFilter("resalte", ["==", ["get", "m"], ""]);
+    if (map && map.getLayer("resalte")) {
+      map.setFilter("resalte", ["==", ["get", "m"], ""]);
+    }
     ficha.hidden = true;
   }
   document.getElementById("cerrar").addEventListener("click", soltar);
@@ -534,13 +490,12 @@ h1 {
     document.getElementById("pie").open = false;
   }
 
-  // ---- ficha ----
-  var ficha = document.getElementById("ficha");
-  var hint = document.getElementById("hint");
-
   function percentil(valor) {
     var v = stats[idx].orden, lo = 0, hi = v.length;
-    while (lo < hi) { var mid = (lo + hi) >> 1; if (v[mid] < valor) lo = mid + 1; else hi = mid; }
+    while (lo < hi) {
+      var mid = (lo + hi) >> 1;
+      if (v[mid] < valor) lo = mid + 1; else hi = mid;
+    }
     return Math.round((lo / v.length) * 100);
   }
 
@@ -550,8 +505,8 @@ h1 {
     hint.style.opacity = "0";
 
     if (!p.s) {
-      // Sin habilitaciones en doce años. No es un score bajo: es que no hay
-      // con qué calcularlo, y decirlo vale más que mostrar un número inventado.
+      // Sin habilitaciones en doce años. No es un score bajo: es que no hay con
+      // qué calcularlo, y decirlo vale más que mostrar un número inventado.
       document.getElementById("fBarrio").textContent = "Sin actividad comercial registrada";
       document.getElementById("fScore").textContent = "—";
       document.getElementById("fDelta").innerHTML =
@@ -578,12 +533,88 @@ h1 {
     }
   }
 
+  function colorExpr() {
+    var s = stats[idx];
+    var valor = ["at", idx, ["get", "s"]];
+    // Las manzanas sin historia comercial van en neutro. Son 12.708 de 19.600,
+    // así que sin este caso el mapa queda lleno de agujeros.
+    return ["case", ["has", "s"],
+      ["interpolate", ["linear"], valor,
+        s.p05, css("--s1"), (s.p05 + s.p50) / 2, css("--s2"),
+        s.p50, css("--s3"),
+        (s.p50 + s.p95) / 2, css("--s4"), s.p95, css("--s5")],
+      css("--sin-datos")];
+  }
+
   // MapLibre serializa las propiedades que son arrays, así que vuelven como
   // texto y hay que devolverlas a array antes de indexarlas.
   function propiedades(rasgo) {
     var p = rasgo.properties;
     if (typeof p.s === "string") p.s = JSON.parse(p.s);
     return p;
+  }
+
+  // ------------------------------------------------------------------
+  // Recién ahora el mapa, y con red: si WebGL no está disponible la página
+  // queda usable —los rubros, la escala, los promedios— y dice por qué.
+  // ------------------------------------------------------------------
+  try {
+    map = new maplibregl.Map({
+      container: "map",
+      style: { version: 8, sources: {}, layers: [] },
+      center: [-64.19, -31.41], zoom: 11.4, minZoom: 9.5, maxZoom: 16,
+      attributionControl: false, dragRotate: false
+    });
+  } catch (e) {
+    avisar("Tu navegador no pudo iniciar el mapa (necesita WebGL). " +
+      "Los rubros y la escala de la izquierda funcionan igual.");
+    return;
+  }
+  map.touchZoomRotate.disableRotation();
+
+  function encuadrar() {
+    map.fitBounds([[-64.32, -31.52], [-64.07, -31.29]], { padding: 24, duration: 0 });
+  }
+
+  map.on("error", function (e) {
+    avisar("El mapa devolvió un error: " + ((e && e.error && e.error.message) || "desconocido"));
+  });
+
+  map.on("load", function () {
+    aviso.hidden = true;
+    map.addSource("mz", { type: "geojson", data: coleccion });
+    map.addLayer({
+      id: "manzanas", type: "fill", source: "mz",
+      paint: { "fill-color": colorExpr(), "fill-opacity": 0.92 }
+    });
+    map.addLayer({
+      id: "bordes", type: "line", source: "mz",
+      paint: { "line-color": css("--ground"), "line-width": 0.5, "line-opacity": 0.55 }
+    });
+    map.addLayer({
+      id: "resalte", type: "line", source: "mz",
+      filter: ["==", ["get", "m"], ""],
+      paint: { "line-color": css("--ink"), "line-width": 2 }
+    });
+    encuadrar();
+  });
+
+  var tocado = false;
+  map.on("dragstart", function () { tocado = true; });
+  map.on("zoomstart", function (e) { if (e.originalEvent) tocado = true; });
+
+  // MapLibre dimensiona su canvas una sola vez, al crearse, y el panel donde se
+  // ve esto se agranda y achica a voluntad. Se reencuadra solo mientras el
+  // lector no haya movido el mapa: después, saltarle la vista es una molestia.
+  if (window.ResizeObserver) {
+    var pendiente;
+    new ResizeObserver(function () {
+      clearTimeout(pendiente);
+      pendiente = setTimeout(function () {
+        map.resize();
+        if (!tocado) encuadrar();
+      }, 120);
+    }).observe(document.getElementById("map"));
   }
 
   map.on("mousemove", "manzanas", function (e) {
