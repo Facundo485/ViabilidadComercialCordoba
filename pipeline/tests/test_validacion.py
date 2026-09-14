@@ -42,6 +42,7 @@ def preparado(monkeypatch):
             pl.lit(-64.18).alias("lon"),
             pl.lit(-31.42).alias("lat"),
             pl.lit("CENTRO").alias("barrio"),
+            pl.format("NEGOCIO {}", pl.col("id_tramite")).alias("nombrefantasia"),
             pl.lit("hash-del-titular").alias("titular"),
         )
     )
@@ -104,3 +105,25 @@ def test_corta_si_los_tramites_son_de_antes_de_la_direccion(monkeypatch, tmp_pat
 
     with pytest.raises(ValueError, match="dirección"):
         validacion._tramites()
+
+
+def test_los_locales_sin_nombre_de_fantasia_quedan_fuera(preparado, monkeypatch):
+    """Sin nombre no hay con qué desempatar si el negocio que Places encuentra es
+    el nuestro o el que lo reemplazó, así que la consulta se paga y no informa.
+    Medido: las 22 primeras sin nombre salieron todas `sin_dato`."""
+    tramites = validacion._tramites().with_columns(
+        # % 3 y no % 2: los períodos que renovaron ocupan dos trámites seguidos,
+        # así que con paridad todos los "abierto" caerían del mismo lado y el
+        # test mediría eso en vez del filtro.
+        pl.when(pl.col("id_tramite") % 3 == 0)
+        .then(pl.lit(""))
+        .otherwise(pl.col("nombrefantasia"))
+        .alias("nombrefantasia")
+    )
+    monkeypatch.setattr(validacion, "_tramites", lambda: tramites)
+
+    m = validacion.muestra(n=40, hoy=HOY)
+
+    assert not m.is_empty()
+    assert set(m["estado_predicho"].unique()) == {"abierto", "cerrado"}
+    assert (m["nombrefantasia"].str.strip_chars() != "").all()

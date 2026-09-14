@@ -126,9 +126,34 @@ Tampoco alcanza con mirar quién habilitó después en la misma dirección: de
 (son locales que conviven, no un relevo). Afinando a calle y altura, o a
 superficie, quedan menos todavía.
 
-La consecuencia es que el evento observable sigue siendo **si renovó**, y que su
-calidad hay que medirla contra una fuente externa en vez de asumirla: para eso
-está `validacion.py`.
+La consecuencia es que el evento observable sigue siendo **si renovó**. Su
+calidad **está medida**, no asumida: `validacion.py` arma la muestra y
+`places.py` la consulta contra Google Places, que sí publica `businessStatus`
+por local.
+
+**Resultado de la calibración** (1.498 locales, 895 con dato utilizable):
+
+| | |
+|---|---|
+| Exactitud del proxy | **61,0%** |
+| Línea base (predecir siempre la clase mayoritaria) | 55,3% |
+| Odds ratio | 2,40 |
+| Significación | p = 2,1e-10 |
+
+**El proxy tiene señal real pero es ruidoso.** Predecir "cerró" duplica largo
+las chances de que en esa dirección hoy opere otro negocio, y eso no es azar con
+n=895. Pero está lejos de ser un objetivo limpio: uno de cada tres casos
+utilizables va para el otro lado.
+
+Es un **piso**, no la calidad verdadera, porque la medición arrastra error
+propio: un local puede cambiar de nombre sin cerrar, el nombre de fantasía del
+GIS puede estar viejo, y Places no indexa todo (603 de 1.498 quedaron sin dato).
+
+**Qué implica para el producto.** El modelo tiene techo: no se puede prometer
+precisión por local que el objetivo no sostiene. El score se presenta agregado
+—manzana y rubro, donde el ruido promedia— y la limitación se declara junto al
+número. Esto no invalida el enfoque: el permiso sigue siendo el mejor proxy
+disponible y es el criterio del propio municipio.
 
 **Limitaciones a declarar en el producto:**
 

@@ -15,6 +15,7 @@ from . import (
     ingest,
     manzanas,
     mapeo,
+    places,
     resumen,
     supervivencia,
     validacion,
@@ -84,6 +85,11 @@ def cmd_muestra(_) -> None:
     validacion.ejecutar()
 
 
+def cmd_places(args) -> None:
+    """Consulta la muestra contra Google Places y calibra el proxy de cierre."""
+    places.ejecutar(n=args.n)
+
+
 def cmd_todo(args) -> None:
     ingest.ejecutar()
     _resumen(manzanas.ejecutar())
@@ -113,6 +119,7 @@ COMANDOS = {
     "supervivencia": cmd_supervivencia,
     "cohortes": cmd_cohortes,
     "muestra": cmd_muestra,
+    "places": cmd_places,
     "todo": cmd_todo,
 }
 
@@ -120,6 +127,13 @@ COMANDOS = {
 def main() -> None:
     parser = argparse.ArgumentParser(prog="viabilidad", description=__doc__)
     parser.add_argument("comando", choices=COMANDOS, help="qué ejecutar")
+    parser.add_argument(
+        "-n",
+        type=int,
+        default=None,
+        help="para `places`: cuántas consultas nuevas hacer como máximo. "
+        "Se factura por llamada, así que conviene arrancar chico.",
+    )
     args = parser.parse_args()
     _log()
     COMANDOS[args.comando](args)

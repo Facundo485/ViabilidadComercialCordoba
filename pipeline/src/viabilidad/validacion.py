@@ -17,10 +17,17 @@ El plan es una muestra chica y una sola consulta, no un proceso recurrente:
 
 Sin ese número, cualquier métrica del modelo se apoya en un supuesto sin medir.
 
-**Qué sale de acá y qué no.** El CSV lleva dirección, rubro y coordenadas —todo
-público, está en el GIS— y el estado predicho. No lleva `titular`: para
-calibrar el proxy no hace falta saber de quién es el local, y lo que no se
-necesita no se manda afuera.
+**Qué sale de acá y qué no.** El CSV lleva dirección, rubro, coordenadas y
+nombre de fantasía —todo público, está en el GIS— y el estado predicho. No
+lleva `titular`: para calibrar el proxy no hace falta saber de quién es el
+local, y lo que no se necesita no se guarda.
+
+De ese CSV, **a Google solo se le manda la dirección y el punto**. El nombre de
+fantasía se usa del lado de acá, para comparar contra el nombre que devuelve la
+consulta: es lo que distingue "el local cambió de dueño" (nuestro proxy acertó,
+el negocio original cerró) de "el mismo negocio sigue operando con el permiso
+vencido" (nuestro proxy erró). Sin ese desempate, un `OPERATIONAL` no dice nada
+sobre el local que nos interesa.
 """
 
 from __future__ import annotations
@@ -52,7 +59,8 @@ def _tramites() -> pl.DataFrame:
     if not archivo.exists():
         raise FileNotFoundError(f"Falta {archivo}. Corré `python -m viabilidad ingest`.")
     df = pl.read_parquet(archivo)
-    if faltan := [c for c in ("id_tramite", "domicilio_loc", "lon", "lat") if c not in df.columns]:
+    claves = ("id_tramite", "domicilio_loc", "lon", "lat", "nombrefantasia")
+    if faltan := [c for c in claves if c not in df.columns]:
         raise ValueError(
             f"La tabla de trámites no trae {faltan}. Es un parquet de antes de que "
             "el ingest pidiera la dirección y la geometría: volvé a correr `ingest`."
@@ -66,7 +74,7 @@ def preparar(hoy: datetime | None = None) -> pl.DataFrame:
     d = supervivencia.duraciones(supervivencia.consolidar(h), hoy=hoy)
 
     con_dir = d.join(
-        _tramites().select("id_tramite", "domicilio_loc", "lon", "lat", "barrio"),
+        _tramites().select("id_tramite", "domicilio_loc", "lon", "lat", "barrio", "nombrefantasia"),
         left_on="ultimo_tramite",
         right_on="id_tramite",
         how="left",
@@ -90,7 +98,14 @@ def _consultables(p: pl.DataFrame) -> pl.DataFrame:
     Un cierre viejo ya no figura, y una dirección repetida no distingue cuál de
     los locales de esa dirección es el nuestro: las dos cosas meterían error de
     la fuente externa dentro de la medición del proxy.
+
+    Y sobre todo: **sin nombre de fantasía la consulta no puede aportar nada.**
+    Que Places diga que en esa dirección opera un negocio no distingue si es el
+    nuestro o el que lo reemplazó, que es justo lo que hay que decidir. Medido
+    sobre las primeras 60 consultas: las 22 sin nombre salieron `sin_dato`, las
+    22. Son llamadas que se facturan y no informan.
     """
+    p = p.filter(pl.col("nombrefantasia").fill_null("").str.strip_chars() != "")
     cerrados = p.filter(
         (pl.col("estado_predicho") == "cerrado")
         & (pl.col("fin_cobertura").dt.year() >= ANIO_CIERRE_MIN)
@@ -152,6 +167,7 @@ def muestra(n: int = N_MUESTRA, semilla: int = 7, hoy: datetime | None = None) -
             "lon",
             "lat",
             "barrio",
+            "nombrefantasia",
             "grupo",
             "rubros",
             "estado_predicho",

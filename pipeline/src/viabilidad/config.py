@@ -47,6 +47,11 @@ CAMPOS_TRAMITE = [
     "calle",
     "numero",
     "domicilio_loc",
+    # El nombre comercial del local. Es el cartel de la vereda, no un dato de
+    # persona, y es lo único que permite distinguir "el local cambió de dueño"
+    # de "el mismo negocio sigue con el permiso vencido" cuando se cruza contra
+    # una fuente externa. Se compara localmente: no sale del pipeline.
+    "nombrefantasia",
     "lon",
     "lat",
 ]

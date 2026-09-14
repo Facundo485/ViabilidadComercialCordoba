@@ -15,6 +15,8 @@ Paso 2  [OK]         Renovaciones encadenadas con el titular de la vista.
 Paso 2b [OK]         Estratificado por cohorte: el efecto de rubro existe y es
                      estable entre cohortes independientes (rho 0,68).
 Paso 3  [LIBRE]      Features. Ya se puede empezar.                          <-- acá
+Places  [OK]         Proxy calibrado: 61,0% de exactitud contra 55,3% de base.
+                     Tiene señal real, pero es ruidoso. Ver abajo.
 ```
 
 ---
@@ -226,6 +228,46 @@ Eso convierte el proxy de supuesto en número medido.
 Un criterio de cierre concreto: la correlación entre `s5` y el año mediano del
 rubro tiene que bajar a algo que se pueda explicar por el negocio y no por el
 calendario. Con 0,58 todavía no.
+
+---
+
+## La calibración contra Places (hecha)
+
+`python -m viabilidad muestra` arma la muestra y `python -m viabilidad places`
+la consulta. Son ~1.500 llamadas, una sola vez, contra una cuota gratis de 5.000
+por mes del SKU Text Search Pro: **costo cero**. Las respuestas crudas se
+cachean en `data/procesado/places_cache.jsonl`, así que volver a correrlo no
+vuelve a facturar y corregir el clasificador es gratis.
+
+```
+                 sin_dato   sigue_el_mismo   otro_negocio
+predicho abierto    271          312             166
+predicho cerrado    332          183             234
+
+exactitud 61,0% | línea base 55,3% | odds ratio 2,40 | p=2,1e-10 | n=895
+```
+
+**El proxy tiene señal pero es ruidoso.** Uno de cada tres casos utilizables va
+para el otro lado. Y es un piso, no la calidad real: un local puede cambiar de
+nombre sin cerrar, el nombre de fantasía del GIS puede estar viejo, y Places no
+indexa todo (603 de 1.498 sin dato).
+
+Tres cosas que costó descubrir y conviene no repetir:
+
+- **Places responde "¿hay un negocio acá?", no "¿sobrevivió el nuestro?".** Un
+  `OPERATIONAL` sobre un local que dimos por cerrado es ambiguo: puede ser el
+  sucesor (acertamos) o el mismo con el permiso vencido (erramos). El desempate
+  es comparar el nombre contra `nombrefantasia`, que se hace localmente.
+- **Hay que mirar todos los lugares devueltos, no el primero.** Places ordena
+  por prominencia, y en una galería el primero es el edificio o el colegio
+  mientras nuestro kiosco es el cuarto. Arreglarlo movió la exactitud de 58,4%
+  a 61,0% sin una llamada más.
+- **Sin nombre de fantasía la consulta no puede aportar nada**, así que esos
+  locales quedan fuera de la muestra. Las primeras 22 que se consultaron sin
+  nombre dieron `sin_dato` las 22: son llamadas que se pagan y no informan.
+
+**Qué implica.** El modelo tiene techo. El score va agregado a manzana y rubro,
+donde el ruido promedia, y la limitación se declara junto al número.
 
 ---
 
