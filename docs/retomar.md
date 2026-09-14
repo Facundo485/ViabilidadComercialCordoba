@@ -527,6 +527,44 @@ Lo que haría falta es una medida sensible a densificación —altura o volumen
 edificado, no superficie—. Open Buildings 2.5D Temporal tiene altura anual
 2016-2023, pero requiere cuenta de Earth Engine.
 
+### La altura edificada: la mejor medición, y el resultado definitivo
+
+`python -m viabilidad altura` trae la altura edificada por zona y año desde
+`GOOGLE/Research/open-buildings-temporal/v1`, vía Earth Engine. **1.428 zonas x
+8 años (2016-2023)**, y es la medición más limpia de todo el proyecto:
+
+```
+correlación entre años consecutivos   0,999
+correlación 2016 vs 2023              0,993   (los edificios no encogen)
+zonas que crecieron                   76%
+altura media de la ciudad             0,611 m -> 0,725 m
+```
+
+Esta vez el instrumento no es la excusa: mide densificación —que era lo que le
+faltaba al NDBI—, es estable, y tiene variación real.
+
+**Y el resultado es el que explica todo lo anterior:**
+
+```
+NIVEL   altura 2023      vs  comercio 2026       r = +0,656
+CAMBIO  Δaltura 2019-22  vs  Δcomercio 2022-26   r = +0,136
+        Δaltura 2016-19  vs  Δcomercio 2019-22   r = -0,001
+        ídem con retardo de 3 años más            r = -0,018
+```
+
+Fuerte en nivel, nulo en cambio. **El comercio de Córdoba ya está en equilibrio
+con su forma construida**: donde hay edificios altos hay comercio, y esa
+relación es estable. Lo que se mueve año a año es churn alrededor de ese
+equilibrio — y el equilibrio casi no se mueve: la altura media creció **0,114 m
+en siete años**.
+
+Esa es la explicación de los seis intentos fallidos. No es que falte la variable
+correcta: **la ciudad no se transforma lo bastante rápido, ni la ventana es lo
+bastante larga, como para que haya mucho que predecir** a nivel de zona.
+
+Como feature del modelo de nivel tampoco mueve la aguja: **+0,002** de AUC en
+validación temporal, consistente con estar a 0,015 del techo del objetivo.
+
 ### Qué lo destrabaría
 
 Más años —llegan a uno por año— o una señal externa que vea el crecimiento
@@ -546,6 +584,12 @@ de para qué exactamente.
 
 **Lo que sí es defendible hoy** es describir qué zonas están creciendo *ahora*
 —es medición, no predicción— y el score de nivel por manzana x rubro.
+
+**Y hay un producto que el dato sí sostiene, que no es el que buscábamos:** la
+altura correlaciona 0,656 con el comercio en nivel. Una zona que está muy por
+debajo de lo que su forma construida predice es una anomalía medible hoy, sin
+pronosticar nada. No dice "esta zona va a despegar", dice "acá hay más densidad
+edificada que comercio". Es más modesto y es verdad.
 
 ### Lo que sigue, entonces
 
