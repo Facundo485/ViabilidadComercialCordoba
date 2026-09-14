@@ -23,6 +23,7 @@ from . import (
     resumen,
     supervivencia,
     validacion,
+    zonas,
 )
 
 
@@ -104,6 +105,11 @@ def cmd_muestra(_) -> None:
     validacion.ejecutar()
 
 
+def cmd_zonas(_) -> None:
+    """¿Se puede predecir qué zonas van a mejorar? Diagnóstico de trayectoria."""
+    zonas.ejecutar()
+
+
 def cmd_modelo(_) -> None:
     """¿El entorno predice supervivencia? Validación espacial y temporal."""
     modelo.ejecutar()
@@ -147,6 +153,7 @@ COMANDOS = {
     "features": cmd_features,
     "muestra": cmd_muestra,
     "modelo": cmd_modelo,
+    "zonas": cmd_zonas,
     "places": cmd_places,
     "todo": cmd_todo,
 }

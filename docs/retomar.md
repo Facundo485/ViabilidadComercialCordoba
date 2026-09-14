@@ -406,6 +406,57 @@ es el techo para predecir *la etiqueta ruidosa* — la capacidad real sobre el
 desenlace verdadero es probablemente mayor, pero con este objetivo no se puede
 medir cuánto.
 
+---
+
+## "Zonas con potencial a futuro": por qué no sale con estos datos
+
+Es una pregunta **distinta** de la que responde `modelo.py`. Ese predice
+**nivel** —qué tan buena es una zona hoy—; aquello sería **trayectoria** —qué
+zona va a estar mejor en cinco años—. Para un producto de "zonas emergentes" la
+que importa es la segunda.
+
+**La buena noticia: el techo de 0,608 no aplica acá.** Ese techo es para predecir
+el desenlace de un local desde una etiqueta ruidosa por local. Al agregar decenas
+de locales por zona, el error del proxy se promedia y cae con la raíz de n. La
+pregunta por zona esquiva el cuello de botella que encontramos.
+
+**La mala: no alcanzan los datos, y es estructural.** `python -m viabilidad zonas`:
+
+```
+¿El crecimiento pasado predice el futuro? (celdas de 800 m)
+  Δ14-18 -> Δ18-22   +0,366   <- tramo contaminado: la ventana se está llenando
+  Δ18-22 -> Δ22-26   -0,108   <- tramo limpio: nada
+
+momentum por tamaño de zona, en el tramo limpio
+  medianas  n= 70   -0,350
+  grandes   n=181   +0,119
+```
+
+Los signos se dan vuelta entre estratos, así que el -0,11 global no es un
+fenómeno: es un estrato. Las features de nivel tampoco aportan (share actual
++0,01, aperturas +0,05, supervivencia previa de la zona +0,16).
+
+**Por qué.** El histórico va de 2014 a 2026, pero **solo desde 2019 la ventana de
+observación está completa** — antes, el stock "crece" de 6.690 a 33.368 nada más
+que porque vamos acumulando años. Con horizontes de 3 o 4 años, eso deja **una o
+dos transiciones independientes por zona**. No es que la trayectoria sea
+impredecible: es que con dos observaciones no hay con qué aprender ni con qué
+validar, y cualquier correlación que aparezca no tiene contra qué replicarse.
+
+Dos trampas que hay que esquivar para siquiera plantear la pregunta, las dos ya
+resueltas en el módulo: medir en **participación sobre la ciudad** y no en stock
+absoluto, y predecir el **cambio** y no el nivel, porque el estado futuro de una
+zona está pegadísimo al actual y un modelo de nivel da métricas hermosas sin
+predecir nada.
+
+**Qué lo destrabaría:** más años —llegan a uno por año—, o una señal externa que
+vea el crecimiento urbano sin depender del registro de habilitaciones. El
+roadmap ya le había asignado ese papel a la capa satelital, y esta es la primera
+evidencia concreta de que hace falta.
+
+**Lo que sí es defendible hoy** es describir qué zonas están creciendo *ahora*
+—es medición, no predicción— y el score de nivel por manzana x rubro.
+
 ### Lo que sigue, entonces
 
 1. **Mejorar el objetivo, no las features.** La palanca concreta: la cuota de
