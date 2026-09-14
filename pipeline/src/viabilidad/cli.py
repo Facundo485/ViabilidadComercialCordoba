@@ -21,6 +21,7 @@ from . import (
     places,
     poblacion,
     resumen,
+    satelital,
     supervivencia,
     validacion,
     zonas,
@@ -105,6 +106,11 @@ def cmd_muestra(_) -> None:
     validacion.ejecutar()
 
 
+def cmd_satelital(_) -> None:
+    """Serie anual de superficie construida desde Sentinel-2."""
+    satelital.ejecutar()
+
+
 def cmd_zonas(_) -> None:
     """¿Se puede predecir qué zonas van a mejorar? Diagnóstico de trayectoria."""
     zonas.ejecutar()
@@ -154,6 +160,7 @@ COMANDOS = {
     "muestra": cmd_muestra,
     "modelo": cmd_modelo,
     "zonas": cmd_zonas,
+    "satelital": cmd_satelital,
     "places": cmd_places,
     "todo": cmd_todo,
 }

@@ -472,6 +472,61 @@ gratis, pero lo que crece ahí es el mapeo, no la ciudad: los edificios saltan d
 "triplican" desde 2012. Córdoba no triplicó sus calles. **OSM queda descartado
 como señal de crecimiento** — es el mismo artefacto de ventana, con otra cara.
 
+### Se probó el satélite, y el resultado es negativo con explicación
+
+`python -m viabilidad satelital` arma una serie anual de superficie construida
+desde Sentinel-2, leyendo COGs de AWS por ventana — sin cuenta en ningún lado y
+sin bajar ninguna escena entera. **Diez veranos limpios, 2016-17 a 2025-26**,
+contra la una o dos transiciones que deja el registro de habilitaciones.
+
+**Dos errores de medición que costaron encontrar y que sin el chequeo de
+estabilidad habrían pasado por resultado:**
+
+1. **El offset del baseline 04.00.** Desde enero de 2022 ESA le suma 1000 a
+   todas las bandas. Element84 normalmente lo revierte y lo informa en el STAC
+   (`earthsearch:boa_offset_applied`), pero en el verano 2021-22 no lo hizo:
+   el NIR daba 4306 contra ~2900 de todos los demás años. NDBI y NDVI son
+   cocientes, así que un offset constante no se cancela, desplaza el índice.
+2. **La ventana estacional era demasiado ancha.** Con diciembre-febrero y
+   eligiendo por nubes, un año caía todo en diciembre y el siguiente todo en
+   febrero. En clima de lluvias estivales eso son dos estados de vegetación
+   distintos. Se apretó a enero-febrero.
+
+El chequeo que los destapó: **una zona construida sigue construida**. Antes de
+corregir, las correlaciones entre veranos consecutivos daban -0,09, -0,10,
+-0,23. Después:
+
+```
+2016-17  0,86    2019-20  0,64    2022-23  0,73
+2017-18  0,86    2020-21  0,69    2023-24  0,71
+2018-19  0,90    2021-22  0,87    2024-25  0,67
+                                  2016-25  0,63
+```
+
+Los edificios no desaparecen, así que las negativas eran un problema de
+medición y no de la ciudad. Corregido, la señal espacial es 3x el ruido temporal.
+
+**Y con el índice ya sano, la hipótesis falla igual:**
+
+```
+construcción 16->19  vs  comercio 19->22    r = -0,033
+construcción 19->22  vs  comercio 22->25    r = -0,165
+```
+
+El cuartil que más construyó es el que **menos** comercio ganó. Y como feature
+del modelo de nivel tampoco suma: +0,003 / -0,003 / +0,001 en validación
+temporal.
+
+**Por qué, y esto es lo que hay que retomar.** El NDBI a 800 m detecta la
+conversión de vegetación o suelo a construido, o sea **expansión de la frontera
+urbana**. No detecta **densificación**: una torre que reemplaza una casa deja la
+zona igual de "construida". Y el comercio de Córdoba crece en zonas ya
+construidas, no en la frontera. El indicador mide lo que no es.
+
+Lo que haría falta es una medida sensible a densificación —altura o volumen
+edificado, no superficie—. Open Buildings 2.5D Temporal tiene altura anual
+2016-2023, pero requiere cuenta de Earth Engine.
+
 ### Qué lo destrabaría
 
 Más años —llegan a uno por año— o una señal externa que vea el crecimiento
