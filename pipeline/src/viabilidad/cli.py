@@ -115,6 +115,11 @@ def cmd_mapa(_) -> None:
     mapa.ejecutar()
 
 
+def cmd_valor(_) -> None:
+    """¿Conviene etiquetar más locales con Places? La curva dice que no."""
+    places.ejecutar_valor()
+
+
 def cmd_fuga(_) -> None:
     """¿El indicador publicado por el municipio se incluye a sí mismo? Sí."""
     diagnostico.ejecutar_fuga()
@@ -194,6 +199,7 @@ COMANDOS = {
     "geometria": cmd_geometria,
     "score": cmd_score,
     "fuga": cmd_fuga,
+    "valor": cmd_valor,
     "mapa": cmd_mapa,
     "places": cmd_places,
     "todo": cmd_todo,

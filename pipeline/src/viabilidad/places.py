@@ -533,3 +533,98 @@ def ejecutar(n: int | None = None) -> pl.DataFrame:
     r.write_csv(salida)
     print(f"\nEscrito en {salida}")
     return r
+
+
+# ---------------------------------------------------------------------------
+# ¿Conviene etiquetar más? La respuesta cambió cuando se midió.
+# ---------------------------------------------------------------------------
+
+TAMANOS = (60, 120, 200, 300, 350)
+TEST_VERDAD = 150
+REPETICIONES = 25
+
+
+def _con_verdad():
+    """Los locales calibrados que además tienen features, con su desenlace real."""
+    from . import modelo
+
+    etiquetas = (
+        pl.read_csv(config.DIR_PROCESADO / ARCHIVO_RESULTADO)
+        .filter(pl.col("observado") != "sin_dato")
+        .select(
+            "ultimo_tramite",
+            (pl.col("observado") == "sigue_el_mismo").cast(pl.Int8).alias("verdad"),
+        )
+    )
+    d = modelo._datos()
+    estructura = [c for c in modelo.ESTRUCTURA if c in d.columns]
+    columnas = ["rubro_cod", *modelo.ENTORNO, *estructura]
+    return d, d.join(etiquetas, on="ultimo_tramite", how="inner"), columnas, etiquetas
+
+
+def valor_de_etiquetar() -> pl.DataFrame:
+    """Curva de aprendizaje entrenando sobre el desenlace verificado.
+
+    Durante un buen rato la conclusión del proyecto fue que el cuello de botella
+    era el objetivo: el proxy acierta el 61%, eso pone un techo de AUC 0,608, y
+    la palanca obvia era etiquetar más locales con Places —5.000 gratis por mes—
+    para entrenar sobre verdad.
+
+    Medido, esa palanca no existe. Entrenando sobre los desenlaces verificados,
+    el AUC contra la verdad se aplana alrededor de 0,635 a partir de unas 200
+    etiquetas, y ahí se queda. El modelo entrenado sobre 62.000 etiquetas
+    ruidosas llega a 0,631, o sea al mismo lugar.
+
+    La lectura es que el límite se corrió de lugar: **no lo pone el ruido de la
+    etiqueta sino las variables**. Con etiquetas perfectas, la ubicación, el
+    rubro y el entorno socioeconómico explican alrededor de 0,64 de la
+    supervivencia de un comercio y no más. El resto depende de cosas que ningún
+    dato público observa: quién lo abre, con cuánto capital y con qué idea.
+
+    Etiquetar más sigue sirviendo para **medir** con precisión —con 500 casos el
+    error estándar del AUC ronda 0,04— pero no para predecir mejor.
+    """
+    import numpy as np
+    from sklearn.ensemble import HistGradientBoostingClassifier
+    from sklearn.metrics import roc_auc_score
+
+    _, m, columnas, _ = _con_verdad()
+    X = m.select(columnas).to_numpy()
+    Y = m["verdad"].to_numpy()
+    if len(Y) < TEST_VERDAD * 2:
+        raise ValueError(f"Solo {len(Y)} etiquetas verificadas; no alcanza para la curva.")
+
+    rng = np.random.default_rng(0)
+    filas = []
+    for n in TAMANOS:
+        v = []
+        for _ in range(REPETICIONES):
+            idx = rng.permutation(len(Y))
+            prueba, entrena = idx[:TEST_VERDAD], idx[TEST_VERDAD : TEST_VERDAD + n]
+            if len(np.unique(Y[entrena])) < 2:
+                continue
+            mo = HistGradientBoostingClassifier(
+                max_iter=120, learning_rate=0.08, max_depth=3, random_state=0
+            )
+            mo.fit(X[entrena], Y[entrena])
+            v.append(roc_auc_score(Y[prueba], mo.predict_proba(X[prueba])[:, 1]))
+        filas.append(
+            {"etiquetas": n, "auc": round(float(np.mean(v)), 3), "sd": round(float(np.std(v)), 3)}
+        )
+    return pl.DataFrame(filas)
+
+
+def ejecutar_valor() -> None:
+    print(f"\n{'=' * 72}\n  ¿Conviene etiquetar más locales con Places?\n{'=' * 72}\n")
+    curva = valor_de_etiquetar()
+    with pl.Config(tbl_hide_dataframe_shape=True):
+        print(curva)
+    plano = curva["auc"][-1] - curva["auc"][max(0, len(curva) - 3)]
+    print(
+        f"\nDe {curva['etiquetas'][-3]} a {curva['etiquetas'][-1]} etiquetas el AUC se mueve "
+        f"{plano:+.3f}: la curva está plana.\n"
+        "El modelo entrenado con 62.000 etiquetas ruidosas llega al mismo lugar.\n\n"
+        "El límite ya no lo pone el ruido del objetivo sino las variables. Con\n"
+        "etiquetas perfectas, ubicación y rubro explican ~0,64 de la supervivencia\n"
+        "y no más: el resto es quién abre el local, con cuánto y con qué idea."
+    )
