@@ -227,15 +227,21 @@ def test_un_tramite_no_se_cuenta_dos_veces_en_el_mismo_rubro(monkeypatch, datos)
     """El nomenclador viejo y el CLANAE nuevo describen lo mismo: un trámite
     habilitado bajo ambos cae dos veces en el mismo nivel2 si no se deduplica."""
     parcelas, historial = datos
+    manzana = historial[0]["nro_catastral"][:9]
+
+    def total_almacen(filas):
+        _falso_gis(monkeypatch, parcelas, filas)
+        detalle = manzanas.por_rubro(ingest.descargar_historial())
+        return detalle.filter((pl.col("manzana") == manzana) & (pl.col("nivel2") == "almacen"))[
+            "total"
+        ].sum()
+
+    antes = total_almacen(historial)
+
     # Las dos entradas caen en nivel2 "almacen": una es del nomenclador viejo y
-    # la otra del CLANAE nuevo.
+    # la otra del CLANAE nuevo. Son dos filas de un mismo trámite, así que el
+    # rubro tiene que sumar uno solo, no dos.
     duplicado = dict(historial[0], objectid=999_999, rubronombre="Almacén de comestibles")
     gemelo = dict(duplicado, objectid=999_998, rubronombre="VENTA AL POR MENOR EN MINIMERCADOS")
-    _falso_gis(monkeypatch, parcelas, [*historial, duplicado, gemelo])
 
-    detalle = manzanas.por_rubro(ingest.descargar_historial())
-    del_tramite = detalle.filter(
-        (pl.col("manzana") == historial[0]["nro_catastral"][:9]) & (pl.col("nivel2") == "almacen")
-    )
-    # Los dos rubronombre caen en "almacen": el trámite tiene que sumar 1, no 2.
-    assert del_tramite["total"].sum() == 1
+    assert total_almacen([*historial, duplicado, gemelo]) == antes + 1

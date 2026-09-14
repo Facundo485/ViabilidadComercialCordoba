@@ -281,6 +281,7 @@ React/
     │   ├── resumen.py         # CSV agregados para revisar o commitear
     │   ├── diagnostico.py     # chequea que la tasa no mida antigüedad
     │   ├── supervivencia.py   # Kaplan-Meier sobre períodos de actividad
+    │   ├── cohortes.py        # el mismo KM estratificado por cohorte de alta
     │   ├── validacion.py      # muestra para calibrar el proxy contra Places
     │   └── cli.py
     └── tests/
@@ -301,6 +302,7 @@ Comandos:
 python -m viabilidad {rubros|mapeo|ingest|manzanas|resumen|todo}
 python -m viabilidad diagnostico     # ¿la tasa mide el nomenclador? (no necesita red)
 python -m viabilidad supervivencia   # Kaplan-Meier por rubro (necesita ingest previo)
+python -m viabilidad cohortes        # Paso 2b: estratificado por cohorte de alta
 python -m viabilidad muestra         # muestra para calibrar el proxy contra Places
 ```
 
@@ -362,15 +364,31 @@ se parece a esa proporción, *es* esa proporción. Un modelo de dos parámetros
 el rubro— explica el 87% de la varianza entre rubros. La tabla de supervivencia
 por rubro no contiene información sobre los rubros.
 
-**El reemplazo ya corrió sobre los datos reales y el bloqueante está a medias.**
-`supervivencia.py` consolida renovaciones y hace Kaplan-Meier con `lifelines`.
-Con el titular real (11,3% de los períodos tienen al menos una renovación) el
-chequeo de dominio pasa —gastronomía 40,3% contra farmacia 43,5%— pero la época
-sigue explicando buena parte de la tabla: `s5` correlaciona 0,71 con el año
-mediano del rubro, y 0,58 restringiendo a cohortes con ventana completa. La
-`mediana_anios` sigue dando 4,999 en los 76 rubros, que es el plazo del permiso.
-No leer la tabla por rubro como resultado todavía. El Paso 2b está en
-`docs/proximo-paso.md`.
+**El bloqueante está cerrado.** `supervivencia.py` consolida renovaciones y hace
+Kaplan-Meier con `lifelines`; `cohortes.py` lo estratifica por cohorte de alta.
+El chequeo de dominio pasa (gastronomía 17,7% contra farmacia 24,0% a 5,5 años)
+y, sobre todo, **el orden de los rubros se sostiene entre cohortes
+independientes**: rho de Spearman 0,59 a 0,76 entre pares de cohortes, 0,68 de
+promedio. Dentro de una cohorte la época está fija, así que esa estabilidad es
+la evidencia de que hay un efecto de rubro real y no un artefacto de calendario.
+
+**Nunca evaluar la supervivencia a los 5 años exactos.** Casi todos los permisos
+duran ese plazo, así que la curva es plana y cae de golpe ahí: S(4,99)=0,97 y
+S(5,01)=0,22. `predict(5.0)` devuelve la posición arbitraria dentro del salto,
+no una supervivencia — depende de cuántos vencimientos cayeron unos días antes o
+después del aniversario. Así se reportó una supervivencia de ciudad del 43%
+donde el número real es 21%. Los horizontes van **después** de cada escalón
+(`HORIZONTES = (5.5, 10.5)`), y hay un test que lo impide
+(`test_el_horizonte_no_cae_adentro_del_escalon_administrativo`). El de 3 años
+que pedía el roadmap no distingue nada: antes del primer vencimiento S(3)=1.
+
+**La feature de rubro es `efecto`, no `s5_5`.** Está en `efecto_rubro.csv`: los
+puntos de supervivencia de cada rubro por encima de la ciudad **de su misma
+cohorte**. El `s5_5` crudo mezcla el rubro con su época; el `efecto` no. Sigue
+correlacionando 0,51 con el año mediano del rubro, pero eso ya no implica
+confusión —la estabilidad entre cohortes la descarta— sino la asociación
+esperable entre un rubro en crecimiento y un rubro que sobrevive. Cuantificarla
+requiere el Cox con el año como covariable, que va junto con las features.
 
 **La unidad de análisis no es la habilitación: es el período de actividad.** La
 resta `fechavencimientohab - fechahabaprobada` no mide la vida del comercio sino

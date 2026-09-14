@@ -2,7 +2,7 @@ rubronombre,n,nivel2,nivel1
 Almacén de comestibles,5319,almacen,alimentos
 "Venta al por menor de prendas de vestir, excepto las de cuero",3814,ropa,indumentaria
 Kioscos instalados fuera del perímetro señalado en el código 633120.1 (zona 2),3592,kiosco,comercio general
-VENTA AL POR MENOR DE PRODUCTOS DE ALMACÉN Y DIETÉTICA,3310,dietetica,alimentos
+VENTA AL POR MENOR DE PRODUCTOS DE ALMACÉN Y DIETÉTICA,3310,almacen,alimentos
 SERVICIOS DE PREPARACIÓN DE COMIDAS PARA LLEVAR,2583,comida_para_llevar,gastronomia
 "VENTA AL POR MENOR EN KIOSCOS, POLIRRUBROS Y COMERCIOS NO ESPECIALIZADOS N.C.P.",2326,kiosco,comercio general
 OTRAS ACTIVIDADES N.C.P.,2212,comercio_otros,comercio general

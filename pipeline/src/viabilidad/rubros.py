@@ -77,9 +77,14 @@ REGLAS: list[Regla] = [
     ("fiambreria", ALIM, r"fiambreria|fiambres|embutidos", ""),
     ("pescaderia", ALIM, r"pescaderia|pescados|mariscos", ""),
     ("lacteos", ALIM, r"lacteos|\bleche\b|quesos", ""),
+    # Va antes que `dietetica`: el CLANAE nuevo llama al almacén de toda la vida
+    # "venta al por menor de productos de almacén y dietética", y con el orden al
+    # revés esas 3.310 habilitaciones caían en dietética mientras el "Almacén de
+    # comestibles" del nomenclador viejo caía en almacén. El mismo rubro partido
+    # en dos por época, igual que pasó con bar_restaurante y panadería.
+    ("almacen", ALIM, r"almacen|minimercado|autoservicio|supermercado|comestibles", ""),
     ("dietetica", ALIM, r"dieteticos|dietetica|herboristeria|suplementos", ""),
     ("bebidas", ALIM, r"bebidas|vinoteca|vineria|cerveza", ""),
-    ("almacen", ALIM, r"almacen|minimercado|autoservicio|supermercado|comestibles", ""),
     (
         "forrajeria",
         ALIM,

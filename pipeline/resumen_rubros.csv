@@ -1,11 +1,10 @@
 nivel2,nivel1,tramites,vigentes,manzanas,tasa
+almacen,alimentos,9698,3245,3705,0.335
 otro,otro,8261,3102,3066,0.375
 kiosco,comercio general,7037,1915,2890,0.272
-almacen,alimentos,6452,584,3157,0.091
 ropa,indumentaria,6182,1894,1357,0.306
 bebidas,alimentos,4960,2035,2097,0.41
 comida_para_llevar,gastronomia,4891,2149,2111,0.439
-dietetica,alimentos,4756,3051,2253,0.642
 bar_restaurante,gastronomia,4459,1503,1304,0.337
 comercio_otros,comercio general,3472,1019,1749,0.293
 oficina,servicios profesionales,3112,939,1412,0.302
@@ -24,6 +23,7 @@ limpieza,hogar y construccion,1927,529,1273,0.275
 tecnologia,comercio general,1786,666,644,0.373
 juegos_azar,esparcimiento,1727,432,1012,0.25
 jugueteria,esparcimiento,1657,548,833,0.331
+dietetica,alimentos,1506,396,929,0.263
 regaleria,comercio general,1499,0,896,0.0
 forrajeria,alimentos,1486,452,958,0.304
 inmobiliaria,servicios profesionales,1371,399,699,0.291

@@ -45,6 +45,13 @@ CASOS = [
         "venta_vehiculos",
     ),
     ("Venta al por menor de indumentaria para bebes y niños", "ropa_infantil"),
+    # El CLANAE llama al almacén de toda la vida "productos de almacén y
+    # dietética": es el mismo negocio que el "Almacén de comestibles" viejo, y
+    # separarlos parte el rubro en dos mitades que no se solapan en el tiempo.
+    ("VENTA AL POR MENOR DE PRODUCTOS DE ALMACÉN Y DIETÉTICA", "almacen"),
+    ("Almacén de comestibles", "almacen"),
+    ("Venta al por menor de productos dietéticos.", "dietetica"),
+    ("Venta al por menor de herboristería", "dietetica"),
     # Una cancha de paddle y un salón de fiestas no tienen la misma vida útil.
     ("EXPLOTACIÓN DE INSTALACIONES DEPORTIVAS, EXCEPTO CLUBES", "instalaciones_deportivas"),
 ]

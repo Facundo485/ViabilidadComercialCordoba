@@ -9,6 +9,7 @@ import polars as pl
 
 from . import (
     arcgis,
+    cohortes,
     config,
     diagnostico,
     ingest,
@@ -73,6 +74,11 @@ def cmd_supervivencia(_) -> None:
     supervivencia.ejecutar()
 
 
+def cmd_cohortes(_) -> None:
+    """Paso 2b: supervivencia por cohorte de alta, para separar rubro de época."""
+    cohortes.ejecutar()
+
+
 def cmd_muestra(_) -> None:
     """Muestra para calibrar el proxy de cierre contra Google Places."""
     validacion.ejecutar()
@@ -105,6 +111,7 @@ COMANDOS = {
     "resumen": cmd_resumen,
     "diagnostico": cmd_diagnostico,
     "supervivencia": cmd_supervivencia,
+    "cohortes": cmd_cohortes,
     "muestra": cmd_muestra,
     "todo": cmd_todo,
 }

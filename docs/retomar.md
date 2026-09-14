@@ -11,9 +11,10 @@ Hoja de ruta corta para no releer todo. El contexto del proyecto está en
 
 ```
 Paso 1  [OK]         La tasa vieja medía la época, no la supervivencia. Confirmado.
-Paso 2  [A MEDIAS]   Ya hay renovaciones y el chequeo de dominio da OK, pero la
-                     época sigue explicando buena parte de la tabla.          <-- acá
-Paso 3  [BLOQUEADO]  Features. No empezar hasta cerrar lo de arriba.
+Paso 2  [OK]         Renovaciones encadenadas con el titular de la vista.
+Paso 2b [OK]         Estratificado por cohorte: el efecto de rubro existe y es
+                     estable entre cohortes independientes (rho 0,68).
+Paso 3  [LIBRE]      Features. Ya se puede empezar.                          <-- acá
 ```
 
 ---
@@ -68,23 +69,18 @@ cada uno. La unidad de conteo es `id_tramite`.
 144.743 filas -> 71.287 trámites -> 62.560 períodos de actividad
                                     7.075 con al menos una renovación (11,3%)
 Plazo otorgado: 4,83 +/- 0,76 años (mediana 5,00)
-Chequeo de dominio: gastronomía 40,3% vs farmacia 43,5% -> OK
+Chequeo de dominio: gastronomía 17,7% vs farmacia 24,0% -> OK
 ```
 
-Los tres chequeos de la sesión anterior dan bien. **Pero el bloqueante no está
-cerrado**, y conviene ser explícito sobre por qué:
+El 11,3% de renovaciones es poco: el otro 89% termina en el escalón
+administrativo de los 5 años. Por eso `mediana_anios` da 4,999 en todos los
+rubros —es el plazo del permiso, no la vida del comercio— y **no hay que leerla
+como resultado**. Lo que sí se lee es `s5_5`: haber pasado el primer
+vencimiento.
 
-| Señal | Valor | Lectura |
-|---|---|---|
-| Renovaciones | 11,3% de los spells | Hay señal, pero el 89% sigue terminando en el escalón administrativo de los 5 años |
-| `mediana_anios` | 4,999316 en los 76 rubros | La mediana sigue siendo el plazo del permiso: **no leerla como resultado** |
-| `s5` vs año mediano del rubro | Pearson 0,71 | La época sigue explicando buena parte de la tabla (antes era 0,92) |
-| Ídem, en cohortes de alta ≤2019 | Pearson 0,58 | Baja, pero no desaparece |
-| `bar_restaurante` en la cohorte | s5 = 95,3% con 215 spells | El mismo outlier imposible del Paso 1, más chico. Es un artefacto |
-
-O sea: el chequeo de dominio pasó, pero pasar un chequeo no es lo mismo que
-haber sacado el artefacto. Lo de siempre en este proyecto — ante un resultado
-llamativo, buscar primero el artefacto.
+> Las cifras de `s5` que traía antes esta sección (gastronomía 40,3%, farmacia
+> 43,5%, correlaciones de 0,71) estaban mal: el horizonte caía adentro del
+> escalón. Ver "Paso 2b" más abajo.
 
 ---
 
@@ -141,35 +137,79 @@ y fútbol.
 
 | | antes | después |
 |---|---|---|
-| `s5` vs año mediano del rubro | 0,712 | **0,641** |
-| ídem, cohortes alta ≤2019 | 0,581 | **0,453** |
-| `s5` vs proporción de nomenclador nuevo (cohortes) | 0,569 | **0,254** |
 | rubros segregados por nomenclador | 13 de 73 | **11 de 72** |
-| `bar_restaurante` | 1.598 spells, s5 95,3% | **4.088 spells, s5 39,3%** |
+| `bar_restaurante` | 1.598 spells, outlier imposible | **4.088 spells, adentro de gastronomía** |
 
-El outlier imposible desapareció y el chequeo de dominio ahora pasa por la razón
-correcta: gastronomía 40,1% contra farmacia 43,5%, con `bar_restaurante` adentro
-de gastronomía y con volumen real.
+El outlier desapareció y el chequeo de dominio pasa por la razón correcta, con
+`bar_restaurante` dentro de gastronomía y con volumen real.
 
-**Sigue abierto:** 0,45 de correlación con la época no es cero. Quedan los dos
-puntos de abajo —estratificar por cohorte y meter el año en un Cox— y los 11
-rubros que todavía existen bajo un solo nomenclador.
+Hubo un segundo caso idéntico, que apareció recién al estratificar por cohorte:
+el CLANAE nuevo llama al almacén de toda la vida **"venta al por menor de
+productos de almacén y dietética"**, y esas 3.310 habilitaciones caían en
+`dietetica` mientras el "Almacén de comestibles" viejo caía en `almacen`. El
+mismo rubro partido en dos por época. Al ordenar la regla de `almacen` antes que
+la de `dietetica`: almacen 6.467 -> 9.777, dietetica 5.051 -> 1.741.
 
 ---
 
-## Lo que sigue (Paso 2b)
+## Paso 2b: el resultado, y un bug que invalidó los números anteriores
 
-1. **Arreglar el mapeo de rubros** (ver la sección de arriba). Empezar por
-   sacar la gastronomía vieja de `panaderia` y unirla con `bar_restaurante`, y
-   por los 13 rubros segregados por nomenclador. Después volver a medir la
-   correlación con la época: si baja mucho, el resto del Paso 2b es más chico
-   de lo que parece.
-2. **Medir `s5` dentro de cohortes de alta fijas** (una curva por rubro y año de
-   alta) en vez de mezclar doce años de altas en una sola curva. Si el orden
-   entre rubros se mantiene dentro de cada cohorte, la señal es real.
-3. **Ajustar por época explícitamente** —el año de alta como covariable en un
-   Cox— en lugar de esperar que la censura lo resuelva sola.
-4. Recién con eso, el Paso 3.
+**Primero la corrección.** Todos los `s5` que figuraban antes en este documento
+y en los commits hasta `855e8c8` estaban mal. El horizonte de 5 años caía
+**justo adentro del escalón administrativo**: como casi todos los permisos duran
+exactamente 5 años, la curva es plana y se desploma en ese punto —S(4,99)=0,97 y
+S(5,01)=0,22 sobre los datos reales— así que `predict(5.0)` no devolvía una
+supervivencia sino la posición arbitraria dentro del salto, que depende de
+cuántos vencimientos cayeron unos días antes o después del aniversario exacto.
+
+Así salía una "supervivencia de la ciudad a 5 años" del 43% donde el número
+real, apenas pasado el escalón, es 21%. Y explicaba la línea base delirante de
+la primera corrida por cohortes: 52%, 16% y 47% en cohortes consecutivas.
+
+Los horizontes ahora van **después** de cada escalón: `HORIZONTES = (5.5, 10.5)`,
+o sea "sobrevivió a la primera renovación" y "a la segunda". El de 3 años que
+pedía el roadmap no sirve acá: antes del primer vencimiento S(3)=1 para todos
+los rubros. `test_el_horizonte_no_cae_adentro_del_escalon_administrativo` mueve
+el vencimiento unos días y verifica que el resultado no se mueva.
+
+**El resultado del Paso 2b.** Estratificando por cohorte de alta, cada rubro se
+compara contra la ciudad de su misma cohorte:
+
+```
+Supervivencia de la ciudad a 5,5 años     Estabilidad del orden entre cohortes
+  2014-2015   12.755 spells   14,0%         2014-15 vs 2016-17   rho 0,70
+  2016-2017   14.298 spells   11,3%         2014-15 vs 2018-19   rho 0,59
+  2018-2019   11.404 spells   14,3%         2016-17 vs 2018-19   rho 0,76
+```
+
+**Ese rho de 0,68 promedio es el resultado que destraba la fase.** Las cohortes
+son muestras independientes —locales distintos, años distintos— y dentro de cada
+una la época está fija. Si el orden de los rubros fuera un artefacto de época,
+cada cohorte ordenaría distinto. Ordenan parecido, así que **hay un efecto de
+rubro real que extraer**, que es lo que no se podía afirmar hasta ahora.
+
+**Una advertencia honesta:** el `efecto` todavía correlaciona 0,51 con el año
+mediano del rubro. Pero eso ya no implica confusión: la estabilidad entre
+cohortes descarta que el orden *sea* la época, y una asociación entre "rubro en
+crecimiento" y "rubro que sobrevive" es esperable y probablemente real. Para
+cuantificarlo hace falta el Cox con el año como covariable, que va con las
+features.
+
+`python -m viabilidad cohortes` deja `efecto_rubro.csv` y
+`supervivencia_cohortes.csv`. **El `efecto` es la feature de rubro que hay que
+usar en el modelo, no el `s5_5` crudo**: el crudo mezcla el rubro con su época.
+
+---
+
+## Lo que sigue
+
+1. **El Cox con el año de alta como covariable**, junto con las features. Es lo
+   que va a separar cuánto del efecto de rubro es el rubro y cuánto es que el
+   rubro viene creciendo.
+2. **Los 11 rubros que siguen existiendo bajo un solo nomenclador.** Algunos no
+   tienen arreglo —el nomenclador viejo simplemente no tenía el concepto— pero
+   conviene revisarlos uno por uno antes de meterlos al modelo.
+3. El Paso 3, que ya no está bloqueado.
 
 **En paralelo, la calibración contra Places.** `python -m viabilidad muestra`
 deja 1.500 locales en `data/procesado/muestra_places.csv`, mitad predichos

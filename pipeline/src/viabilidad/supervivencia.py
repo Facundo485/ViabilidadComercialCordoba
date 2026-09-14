@@ -68,9 +68,21 @@ GRACIA_DIAS = 365
 # Debajo de esto la curva de un rubro se mueve por ruido muestral.
 MIN_SPELLS = 100
 
-# Horizontes que se reportan. El de 3 años es el que pedía el roadmap; el de 5
-# es el que importa acá, porque es donde cae el primer vencimiento.
-HORIZONTES = (3, 5)
+# Horizontes que se reportan, y **por qué no son 3 y 5 años**.
+#
+# Casi todos los permisos duran exactamente 5 años, así que la curva es plana
+# hasta ahí y cae de golpe: S(4,99) = 0,97 y S(5,01) = 0,22. Evaluar en 5,0
+# justo cae adentro del escalón, y lo que devuelve no es una supervivencia sino
+# la posición arbitraria dentro de un salto —depende de cuántos vencimientos
+# cayeron unos días antes o después del aniversario exacto—. Así salía una
+# "supervivencia a 5 años" de la ciudad del 43%, contra un 21% real apenas
+# después. Por eso los horizontes van *después* de cada escalón, no encima.
+#
+# Antes del primer vencimiento no pasa nada: S(3) = 1 para todos los rubros, o
+# sea que el horizonte de 3 años que pedía el roadmap no distingue nada acá.
+HORIZONTE_ESCALON = 5.0  # el plazo administrativo: nunca evaluar en este punto
+HORIZONTES = (5.5, 10.5)  # sobrevivir a la primera renovación, y a la segunda
+HORIZONTE_PRINCIPAL = 5.5
 
 COLUMNAS_CLAVE = [
     "id_tramite",
@@ -237,6 +249,11 @@ def duraciones(spells: pl.DataFrame, hoy: datetime | None = None) -> pl.DataFram
     )
 
 
+def _columna(horizonte: float) -> str:
+    """Nombre de columna del horizonte: 5.5 -> "s5_5"."""
+    return "s" + str(horizonte).replace(".", "_")
+
+
 def kaplan_meier(d: pl.DataFrame, por: str) -> pl.DataFrame:
     """Curva de Kaplan-Meier por categoría, con la supervivencia a 3 y 5 años.
 
@@ -266,24 +283,24 @@ def kaplan_meier(d: pl.DataFrame, por: str) -> pl.DataFrame:
             "mediana_anios": float(km.median_survival_time_),
         }
         for h in HORIZONTES:
-            fila[f"s{h}"] = round(float(km.predict(h)), 3)
+            fila[_columna(h)] = round(float(km.predict(h)), 3)
         filas.append(fila)
 
     if not filas:
         raise ValueError(f"Ninguna categoría de {por} llegó a {MIN_SPELLS} spells.")
 
-    return pl.DataFrame(filas).sort(f"s{HORIZONTES[-1]}", descending=True)
+    return pl.DataFrame(filas).sort(_columna(HORIZONTE_PRINCIPAL), descending=True)
 
 
 def _alertar_si_degenerado(km: pl.DataFrame, por: str) -> None:
     """Una curva idéntica en todas las categorías es un bug, no un hallazgo."""
-    columna = f"s{HORIZONTES[-1]}"
+    columna = _columna(HORIZONTE_PRINCIPAL)
     if km[columna].n_unique() <= 1:
         log.error(
             "Todas las categorías de %s dan la misma supervivencia a %s años (%s). "
             "Revisá la consolidación de renovaciones antes de leer esto como resultado.",
             por,
-            HORIZONTES[-1],
+            HORIZONTE_PRINCIPAL,
             km[columna].unique().to_list(),
         )
 
@@ -294,7 +311,7 @@ def chequeo_gastronomia_vs_farmacia(km_n1: pl.DataFrame, km_n2: pl.DataFrame) ->
     Es conocimiento de dominio, no estadística: si da al revés, el objetivo
     sigue midiendo otra cosa. Devuelve None si falta alguno de los dos.
     """
-    columna = f"s{HORIZONTES[-1]}"
+    columna = _columna(HORIZONTE_PRINCIPAL)
     gastro = km_n1.filter(pl.col("nivel1") == "gastronomia")
     farmacia = km_n2.filter(pl.col("nivel2") == "farmacia")
     if gastro.is_empty() or farmacia.is_empty():
@@ -310,7 +327,7 @@ def chequeo_gastronomia_vs_farmacia(km_n1: pl.DataFrame, km_n2: pl.DataFrame) ->
     else:
         veredicto = "AL REVÉS"
 
-    print(f"\nChequeo de dominio — supervivencia a {HORIZONTES[-1]} años:")
+    print(f"\nChequeo de dominio — supervivencia a {HORIZONTE_PRINCIPAL} años:")
     print(f"  gastronomía {g:.1%}  vs  farmacia {f:.1%}  ->  {veredicto}")
     if not ok:
         log.error(

@@ -166,10 +166,11 @@ def test_kaplan_meier_distingue_los_dos_rubros(mercado):
     km = supervivencia.kaplan_meier(
         supervivencia.duraciones(supervivencia.consolidar(mercado), hoy=HOY), "nivel2"
     )
-    s5 = dict(zip(km["nivel2"], km["s5"], strict=True))
+    columna = supervivencia._columna(supervivencia.HORIZONTE_PRINCIPAL)
+    s = dict(zip(km["nivel2"], km[columna], strict=True))
     mediana = dict(zip(km["nivel2"], km["mediana_anios"], strict=True))
 
-    assert s5["duradero"] > s5["efimero"], "el rubro que renueva tiene que sobrevivir más"
+    assert s["duradero"] > s["efimero"], "el rubro que renueva tiene que sobrevivir más"
     assert mediana["duradero"] > mediana["efimero"]
     assert mediana["efimero"] == pytest.approx(5.0, abs=0.5)
 
@@ -192,3 +193,43 @@ def test_sin_consolidar_los_dos_rubros_se_ven_iguales(mercado):
     assert mediana["duradero"] == pytest.approx(mediana["efimero"], abs=0.1), (
         "sin consolidar, ambos rubros miden el plazo del permiso y son indistinguibles"
     )
+
+
+def _curva(jitter_dias: int) -> float:
+    """S(horizonte) cuando todos los permisos vencen a los 5 años clavados.
+
+    `jitter_dias` mueve el vencimiento unos días: es lo que separa a un permiso
+    otorgado un 2 de enero de otro otorgado un 5 de enero, nada más.
+    """
+    from lifelines import KaplanMeierFitter
+
+    plazo = 5 + jitter_dias / supervivencia.DIAS_ANIO
+    duraciones = [plazo] * 90 + [plazo * 2] * 10  # 10% renueva una vez
+    eventos = [1] * 90 + [1] * 10
+
+    km = KaplanMeierFitter().fit(duraciones, event_observed=eventos)
+    return float(km.predict(supervivencia.HORIZONTE_PRINCIPAL))
+
+
+def test_el_horizonte_no_cae_adentro_del_escalon_administrativo():
+    """Regresión: el horizonte estaba en 5,0 y ahí la curva está saltando.
+
+    Casi todos los permisos duran exactamente 5 años, así que S(t) cae de golpe
+    en ese punto: S(4,99) = 0,97 y S(5,01) = 0,22 sobre los datos reales.
+    Evaluar justo en 5,0 no devuelve una supervivencia sino la posición
+    arbitraria dentro del salto, que depende de cuántos vencimientos cayeron
+    unos días antes o después. Así se reportó una supervivencia de ciudad del
+    43% donde el número real, apenas después del escalón, era 21%.
+
+    El horizonte tiene que dar lo mismo con el escalón unos días a un lado o al
+    otro. Si vuelve a caer encima, este test lo agarra.
+    """
+    assert supervivencia.HORIZONTE_PRINCIPAL != supervivencia.HORIZONTE_ESCALON
+
+    valores = {_curva(dias) for dias in (-5, -1, 0, 1, 5)}
+    assert max(valores) - min(valores) < 0.01, (
+        f"el horizonte se mueve con el jitter del vencimiento: {sorted(valores)}. "
+        "Está cayendo adentro del escalón administrativo."
+    )
+    # Y tiene que estar del lado de después del salto: el 90% que no renovó ya cerró.
+    assert max(valores) < 0.2
