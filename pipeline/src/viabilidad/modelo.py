@@ -58,6 +58,14 @@ ENTORNO = (
 )
 RUBRO = ("rubro_cod",)
 
+# La referencia honesta no es el azar: es lo que cualquiera saca de los datos
+# que el municipio ya publica. La capa 0 del GIS trae `hab_vigentes/hab_total`
+# por parcela ya calculado, así que agregarlo por manzana es un group-by.
+#
+# Si el modelo no le gana a eso, toda la maquinaria de features no está
+# comprando nada, por más que le gane al azar. Medido: le empata.
+MUNICIPIO = ("tasa_municipio", "hab_municipio")
+
 # Las únicas que no salen del churn comercial. Son de barrio y de 2025, así que
 # son gruesas y levemente anacrónicas, pero **no cambian con el período**: si la
 # capacidad de predecir hacia adelante va a mejorar, tiene que venir de acá.
@@ -78,9 +86,23 @@ def _datos() -> pl.DataFrame:
     archivo = config.DIR_PROCESADO / features.ARCHIVO
     if not archivo.exists():
         raise FileNotFoundError(f"Falta {archivo}. Corré `python -m viabilidad features`.")
+
+    manzanas = config.DIR_PROCESADO / "manzanas.parquet"
+    municipio = (
+        pl.read_parquet(manzanas).select(
+            "manzana",
+            (pl.col("hab_vigentes") / pl.col("hab_total")).alias("tasa_municipio"),
+            pl.col("hab_total").alias("hab_municipio"),
+        )
+        if manzanas.exists()
+        else None
+    )
+
+    base = pl.read_parquet(archivo)
+    if municipio is not None:
+        base = base.join(municipio, on="manzana", how="left")
     return (
-        pl.read_parquet(archivo)
-        .with_columns(pl.col("inicio").dt.year().alias("anio"))
+        base.with_columns(pl.col("inicio").dt.year().alias("anio"))
         .filter(pl.col("anio") <= ULTIMO_ANIO)
         .drop_nulls(["barrio"])
         .with_columns(
@@ -150,12 +172,18 @@ def validacion_temporal(d: pl.DataFrame) -> pl.DataFrame:
             {
                 "train_hasta": corte,
                 "n_test": len(test),
+                "municipio": _auc(train, test, _municipio(d)),
+                "municipio_rubro": _auc(train, test, _municipio(d) + RUBRO),
                 "solo_rubro": _auc(train, test, RUBRO),
                 "rubro_entorno": _auc(train, test, RUBRO + ENTORNO),
                 "mas_estructura": _auc(train, test, RUBRO + ENTORNO + _estructura(d)),
             }
         )
     return pl.DataFrame(filas)
+
+
+def _municipio(d: pl.DataFrame) -> tuple[str, ...]:
+    return tuple(c for c in MUNICIPIO if c in d.columns)
 
 
 def ejecutar() -> tuple[pl.DataFrame, pl.DataFrame]:
@@ -175,6 +203,20 @@ def ejecutar() -> tuple[pl.DataFrame, pl.DataFrame]:
     ganancia_t = (temporal["rubro_entorno"] - temporal["solo_rubro"]).mean()
     extra_e = (espacial["mas_estructura"] - espacial["rubro_entorno"]).mean()
     extra_t = (temporal["mas_estructura"] - temporal["rubro_entorno"]).mean()
+    if "municipio" in temporal.columns:
+        muni = temporal["municipio_rubro"].mean()
+        nuestro = temporal["mas_estructura"].mean()
+        print(
+            f"\nContra lo que ya publica el municipio (temporal):\n"
+            f"  su tasa + el rubro        {muni:.3f}\n"
+            f"  nuestro modelo completo   {nuestro:.3f}   ({nuestro - muni:+.3f})"
+        )
+        if nuestro - muni < 0.01:
+            log.warning(
+                "El modelo no le gana a un group-by sobre los datos publicados. "
+                "El aporte del proyecto no está en el score."
+            )
+
     print(f"\n{'aporte sobre el rubro':<34} espacial    temporal")
     print(f"{'  entorno comercial':<34} {ganancia_e:+.3f}      {ganancia_t:+.3f}")
     print(f"{'  + estructura socioeconómica':<34} {extra_e:+.3f}      {extra_t:+.3f}")
