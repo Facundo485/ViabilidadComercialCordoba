@@ -19,11 +19,24 @@ cp data/procesado/datos.js ../mapa/
 `datos.js` pesa ~2,2 MB y sale de `data/`, que está gitignoreado, así que no se
 versiona: se regenera.
 
-## Por qué no hay mapa base
+## Por qué no hay librería de mapas ni mapa base
 
-La página se publica como artifact y ahí la política de contenido bloquea los
-pedidos a servidores de tiles. No es una limitación real: los 6.892 polígonos de
-manzana dibujan la ciudad solos, y las calles aparecen como espacio negativo.
+El dibujo es Canvas 2D a mano, sin MapLibre ni ninguna otra dependencia.
+
+La razón es dura: **el webview de la app de Claude no expone WebGL**, así que
+MapLibre ni siquiera arranca ahí — el constructor tira y la página quedaba
+muerta en el teléfono. Para un coropleta de polígonos estáticos tampoco hacía
+falta: se arma un `Path2D` por manzana una sola vez y cada cuadro es transformar
+y rellenar, que mueve las 19.600 con fluidez.
+
+Tampoco hay mapa base, porque la política de contenido del artifact bloquea los
+pedidos a servidores de tiles. No se nota: los polígonos dibujan la ciudad solos
+y las calles aparecen como espacio negativo entre ellos.
+
+El toque y el arrastre se resuelven con eventos de puntero, y saber qué manzana
+está bajo el dedo con una grilla espacial: probar las 19.600 en cada movimiento
+sería inviable, así que la grilla deja dos o tres candidatas y recién ahí va el
+test exacto de punto en polígono.
 
 ## Qué muestra y qué no
 

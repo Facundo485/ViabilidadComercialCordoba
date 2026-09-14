@@ -2,7 +2,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.js"></script>
 <!-- Geometría de manzanas y score por rubro. Define window.DATOS. Va como
      script y no como fetch porque la política de contenido del artifact
      bloquea los pedidos sueltos, pero un script del mismo origen carga. -->
@@ -80,7 +79,9 @@ body {
 }
 
 #map { position: absolute; inset: 0; background: var(--ground); }
-#map canvas { position: absolute; top: 0; left: 0; outline: none; }
+/* `touch-action: none` es lo que permite arrastrar y hacer pellizco sin que el
+   navegador se quede con el gesto para desplazar la página. */
+#map canvas { position: absolute; top: 0; left: 0; outline: none; touch-action: none; }
 
 .panel {
   position: absolute;
@@ -356,7 +357,6 @@ h1 {
   <p><b>Es predictivo, no causal</b>, y describe el presente: seis hipótesis de trayectoria dieron nulo, así que no dice qué zona va a mejorar. Manzanas sin aperturas recientes se describen con datos más viejos.</p>
 </details>
 
-<script>
 (function () {
   "use strict";
 
@@ -364,7 +364,7 @@ h1 {
   function avisar(texto) { aviso.textContent = texto; aviso.hidden = false; }
 
   // Cualquier excepción que se escape termina en pantalla. Sin esto la página
-  // se queda en blanco y no hay forma de saber qué pasó: ya costó dos rondas.
+  // se queda en blanco y no hay forma de saber qué pasó.
   window.addEventListener("error", function (e) {
     avisar("Se rompió algo al dibujar el mapa: " + (e.message || e.type));
   });
@@ -389,31 +389,52 @@ h1 {
     return getComputedStyle(document.documentElement).getPropertyValue(v).trim();
   }
 
-  // Las coordenadas llegan como enteros delta contra el vértice anterior.
-  // Reconstruirlas acá es lo que permite que el archivo pese 1,9 MB en vez de
-  // 5,1 y que el mapa abra con datos móviles.
-  var feats = D.manzanas.map(function (m) {
-    var d = m[4], anillo = new Array(d.length / 2), x = 0, y = 0;
-    for (var i = 0, j = 0; i < d.length; i += 2, j++) {
+  // ------------------------------------------------------------------
+  // Geometría
+  //
+  // Las coordenadas llegan como enteros delta contra el vértice anterior, lo
+  // que baja el archivo de 5,1 a 1,9 MB. Acá se acumulan a coordenadas de mundo
+  // —píxeles a escala 1, con la Y invertida porque la latitud crece hacia
+  // arriba y el canvas hacia abajo— y se arma un Path2D por manzana. Los paths
+  // se construyen una sola vez: después, cada cuadro es solo transformar y
+  // rellenar, que es lo que hace que 19.600 polígonos se muevan con fluidez.
+  // ------------------------------------------------------------------
+  var K = 20000; // grados a unidades de mundo
+  var manzanas = [];
+  var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+  D.manzanas.forEach(function (m) {
+    var d = m[4], path = new Path2D();
+    var x = 0, y = 0;
+    var bx0 = Infinity, by0 = Infinity, bx1 = -Infinity, by1 = -Infinity;
+    for (var i = 0; i < d.length; i += 2) {
       x += d[i]; y += d[i + 1];
-      anillo[j] = [D.origen[0] + x / D.escala, D.origen[1] + y / D.escala];
+      var wx = (x / D.escala) * K;
+      var wy = -(y / D.escala) * K;
+      if (i === 0) path.moveTo(wx, wy); else path.lineTo(wx, wy);
+      if (wx < bx0) bx0 = wx;
+      if (wy < by0) by0 = wy;
+      if (wx > bx1) bx1 = wx;
+      if (wy > by1) by1 = wy;
     }
-    var props = { m: m[0], b: m[1], n: m[2] };
-    if (m[3]) props.s = m[3];
-    return {
-      type: "Feature",
-      geometry: { type: "Polygon", coordinates: [anillo] },
-      properties: props
-    };
+    path.closePath();
+    if (bx0 < minX) minX = bx0;
+    if (by0 < minY) minY = by0;
+    if (bx1 > maxX) maxX = bx1;
+    if (by1 > maxY) maxY = by1;
+    manzanas.push({
+      m: m[0], b: m[1], n: m[2], s: m[3],
+      path: path, bx0: bx0, by0: by0, bx1: bx1, by1: by1
+    });
   });
-  var coleccion = { type: "FeatureCollection", features: feats };
-  var conScore = feats.filter(function (f) { return f.properties.s; });
+
+  var conScore = manzanas.filter(function (f) { return f.s; });
 
   // Estadística por rubro: promedio y cortes de la escala. Se calcula acá y no
   // en el pipeline para que la escala use el contraste real del rubro elegido
   // en vez de un rango fijo que aplaste a los rubros parejos.
   var stats = rubros.map(function (_, i) {
-    var v = conScore.map(function (f) { return f.properties.s[i]; })
+    var v = conScore.map(function (f) { return f.s[i]; })
       .sort(function (a, b) { return a - b; });
     function q(p) { return v[Math.min(v.length - 1, Math.floor(p * v.length))]; }
     var suma = 0;
@@ -423,18 +444,242 @@ h1 {
 
   var idx = 0;
   var fijada = null;
-  var map = null;
+  var resaltada = null;
   var ficha = document.getElementById("ficha");
   var hint = document.getElementById("hint");
 
   // ------------------------------------------------------------------
-  // La interfaz se arma ANTES del mapa, y no es un detalle de orden: el
-  // constructor de MapLibre necesita WebGL y tira si el navegador no lo tiene.
-  // Estando después, una excepción ahí dejaba los paneles vacíos y sin
-  // explicación — que fue exactamente el bug en el teléfono.
+  // Índice espacial para saber qué manzana está bajo el dedo. Probar las 19.600
+  // en cada movimiento sería inviable; una grilla de celdas deja dos o tres
+  // candidatas y recién ahí se hace el test exacto de punto en polígono.
   // ------------------------------------------------------------------
+  var CELDA = (maxX - minX) / 120;
+  var indice = {};
+  function clave(cx, cy) { return cx + "|" + cy; }
+  manzanas.forEach(function (f, i) {
+    var cx0 = Math.floor((f.bx0 - minX) / CELDA), cx1 = Math.floor((f.bx1 - minX) / CELDA);
+    var cy0 = Math.floor((f.by0 - minY) / CELDA), cy1 = Math.floor((f.by1 - minY) / CELDA);
+    for (var cx = cx0; cx <= cx1; cx++) {
+      for (var cy = cy0; cy <= cy1; cy++) {
+        var k = clave(cx, cy);
+        (indice[k] || (indice[k] = [])).push(i);
+      }
+    }
+  });
 
-  var cont = document.getElementById("rubros");
+  // ------------------------------------------------------------------
+  // Colores
+  // ------------------------------------------------------------------
+  function aRGB(hex) {
+    var h = hex.replace("#", "");
+    if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+    return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+  }
+  var paleta = [], sinDatos = "#ccc", colorFondo = "#fff", colorTinta = "#000";
+  function leerPaleta() {
+    paleta = ["--s1", "--s2", "--s3", "--s4", "--s5"].map(function (v) { return aRGB(css(v)); });
+    sinDatos = css("--sin-datos");
+    colorFondo = css("--ground");
+    colorTinta = css("--ink");
+  }
+  leerPaleta();
+
+  // Escala divergente: el punto neutro es el promedio del rubro, no un valor
+  // redondo. Frío por debajo, cálido por encima.
+  function color(valor) {
+    var s = stats[idx];
+    var cortes = [s.p05, (s.p05 + s.p50) / 2, s.p50, (s.p50 + s.p95) / 2, s.p95];
+    if (valor <= cortes[0]) return "rgb(" + paleta[0].join(",") + ")";
+    if (valor >= cortes[4]) return "rgb(" + paleta[4].join(",") + ")";
+    for (var i = 1; i < 5; i++) {
+      if (valor <= cortes[i]) {
+        var t = (valor - cortes[i - 1]) / (cortes[i] - cortes[i - 1] || 1);
+        var a = paleta[i - 1], b = paleta[i];
+        return "rgb(" + Math.round(a[0] + (b[0] - a[0]) * t) + "," +
+          Math.round(a[1] + (b[1] - a[1]) * t) + "," +
+          Math.round(a[2] + (b[2] - a[2]) * t) + ")";
+      }
+    }
+    return sinDatos;
+  }
+
+  // ------------------------------------------------------------------
+  // Lienzo y vista
+  // ------------------------------------------------------------------
+  var cont = document.getElementById("map");
+  var lienzo = document.createElement("canvas");
+  cont.appendChild(lienzo);
+  var ctx = lienzo.getContext("2d");
+  if (!ctx) {
+    avisar("Tu navegador no pudo dibujar el mapa. Los rubros y la escala funcionan igual.");
+    return;
+  }
+
+  var vista = { s: 1, tx: 0, ty: 0 };
+  var ancho = 0, alto = 0, dpr = 1;
+
+  function medir() {
+    dpr = Math.min(window.devicePixelRatio || 1, 2);
+    ancho = cont.clientWidth;
+    alto = cont.clientHeight;
+    lienzo.width = Math.round(ancho * dpr);
+    lienzo.height = Math.round(alto * dpr);
+    lienzo.style.width = ancho + "px";
+    lienzo.style.height = alto + "px";
+  }
+
+  function encuadrar() {
+    var s = Math.min(ancho / (maxX - minX), alto / (maxY - minY)) * 0.96;
+    vista.s = s;
+    vista.tx = (ancho - (maxX - minX) * s) / 2 - minX * s;
+    vista.ty = (alto - (maxY - minY) * s) / 2 - minY * s;
+  }
+
+  var pedido = null;
+  function dibujar() {
+    if (pedido) return;
+    pedido = requestAnimationFrame(function () {
+      pedido = null;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.fillStyle = colorFondo;
+      ctx.fillRect(0, 0, ancho, alto);
+      ctx.setTransform(vista.s * dpr, 0, 0, vista.s * dpr, vista.tx * dpr, vista.ty * dpr);
+
+      // El borde se dibuja del color del fondo: las calles de Córdoba aparecen
+      // como espacio negativo entre las manzanas, sin necesidad de un mapa base.
+      ctx.lineWidth = 0.6 / vista.s;
+      ctx.strokeStyle = colorFondo;
+      for (var i = 0; i < manzanas.length; i++) {
+        var f = manzanas[i];
+        ctx.fillStyle = f.s ? color(f.s[idx]) : sinDatos;
+        ctx.fill(f.path);
+        if (vista.s > 0.0008) ctx.stroke(f.path);
+      }
+      var sel = fijada || resaltada;
+      if (sel) {
+        ctx.lineWidth = 2.5 / vista.s;
+        ctx.strokeStyle = colorTinta;
+        ctx.stroke(sel.path);
+      }
+    });
+  }
+
+  function ajustar(reencuadrar) {
+    medir();
+    if (reencuadrar) encuadrar();
+    dibujar();
+  }
+
+  // ------------------------------------------------------------------
+  // Qué manzana está bajo el punto
+  // ------------------------------------------------------------------
+  function enPunto(px, py) {
+    var wx = (px - vista.tx) / vista.s;
+    var wy = (py - vista.ty) / vista.s;
+    var cx = Math.floor((wx - minX) / CELDA), cy = Math.floor((wy - minY) / CELDA);
+    var candidatas = indice[clave(cx, cy)];
+    if (!candidatas) return null;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    for (var i = candidatas.length - 1; i >= 0; i--) {
+      var f = manzanas[candidatas[i]];
+      if (wx < f.bx0 || wx > f.bx1 || wy < f.by0 || wy > f.by1) continue;
+      if (ctx.isPointInPath(f.path, wx, wy)) return f;
+    }
+    return null;
+  }
+
+  // ------------------------------------------------------------------
+  // Interacción: arrastrar, rueda, pellizco, y toque para elegir
+  // ------------------------------------------------------------------
+  var punteros = new Map();
+  var arrastre = null, movido = 0, pinza = null;
+
+  lienzo.addEventListener("pointerdown", function (e) {
+    lienzo.setPointerCapture(e.pointerId);
+    punteros.set(e.pointerId, { x: e.offsetX, y: e.offsetY });
+    movido = 0;
+    if (punteros.size === 1) {
+      arrastre = { x: e.offsetX, y: e.offsetY };
+    } else if (punteros.size === 2) {
+      var p = Array.from(punteros.values());
+      pinza = { d: Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y) };
+      arrastre = null;
+    }
+  });
+
+  lienzo.addEventListener("pointermove", function (e) {
+    if (punteros.has(e.pointerId)) punteros.set(e.pointerId, { x: e.offsetX, y: e.offsetY });
+
+    if (pinza && punteros.size === 2) {
+      var p = Array.from(punteros.values());
+      var d = Math.hypot(p[0].x - p[1].x, p[0].y - p[1].y);
+      var cxm = (p[0].x + p[1].x) / 2, cym = (p[0].y + p[1].y) / 2;
+      zoom(d / (pinza.d || d), cxm, cym);
+      pinza.d = d;
+      movido = 99;
+      return;
+    }
+    if (arrastre) {
+      var dx = e.offsetX - arrastre.x, dy = e.offsetY - arrastre.y;
+      movido += Math.abs(dx) + Math.abs(dy);
+      vista.tx += dx; vista.ty += dy;
+      arrastre = { x: e.offsetX, y: e.offsetY };
+      dibujar();
+      return;
+    }
+    // Sin botón apretado: es el mouse paseando. En un touch esto no ocurre.
+    if (fijada) return;
+    var f = enPunto(e.offsetX, e.offsetY);
+    if (f !== resaltada) {
+      resaltada = f;
+      lienzo.style.cursor = f ? "pointer" : "";
+      if (f) mostrar(f); else ficha.hidden = true;
+      dibujar();
+    }
+  });
+
+  function soltarPuntero(e) {
+    punteros.delete(e.pointerId);
+    if (punteros.size < 2) pinza = null;
+    if (punteros.size === 0) {
+      // Un toque corto es una selección; uno largo fue un arrastre.
+      if (arrastre && movido < 8) {
+        var f = enPunto(e.offsetX, e.offsetY);
+        fijada = (f && fijada && fijada.m === f.m) ? null : f;
+        resaltada = null;
+        if (fijada) mostrar(fijada); else ficha.hidden = true;
+        dibujar();
+      }
+      arrastre = null;
+    }
+  }
+  lienzo.addEventListener("pointerup", soltarPuntero);
+  lienzo.addEventListener("pointercancel", soltarPuntero);
+  lienzo.addEventListener("pointerleave", function () {
+    if (fijada || arrastre) return;
+    resaltada = null;
+    ficha.hidden = true;
+    dibujar();
+  });
+
+  function zoom(factor, cx, cy) {
+    var nuevo = Math.max(0.00005, Math.min(vista.s * factor, 0.05));
+    factor = nuevo / vista.s;
+    vista.tx = cx - (cx - vista.tx) * factor;
+    vista.ty = cy - (cy - vista.ty) * factor;
+    vista.s = nuevo;
+    dibujar();
+  }
+
+  lienzo.addEventListener("wheel", function (e) {
+    e.preventDefault();
+    zoom(Math.exp(-e.deltaY * 0.0015), e.offsetX, e.offsetY);
+  }, { passive: false });
+
+  // ------------------------------------------------------------------
+  // Interfaz
+  // ------------------------------------------------------------------
+  var lista = document.getElementById("rubros");
   rubros.forEach(function (r, i) {
     var b = document.createElement("button");
     b.className = "rubro";
@@ -444,16 +689,14 @@ h1 {
       pct(stats[i].media) + '%</span>';
     b.addEventListener("click", function () {
       idx = i;
-      cont.querySelectorAll(".rubro").forEach(function (o, j) {
+      lista.querySelectorAll(".rubro").forEach(function (o, j) {
         o.setAttribute("aria-pressed", j === i ? "true" : "false");
       });
-      if (map && map.getLayer("manzanas")) {
-        map.setPaintProperty("manzanas", "fill-color", colorExpr());
-      }
       pintarLeyenda();
       if (fijada) mostrar(fijada);
+      dibujar();
     });
-    cont.appendChild(b);
+    lista.appendChild(b);
   });
 
   var escala = document.getElementById("escala");
@@ -473,16 +716,14 @@ h1 {
   pintarLeyenda();
 
   document.getElementById("nSinDatos").textContent =
-    (feats.length - conScore.length).toLocaleString("es-AR");
+    (manzanas.length - conScore.length).toLocaleString("es-AR");
 
-  function soltar() {
+  document.getElementById("cerrar").addEventListener("click", function () {
     fijada = null;
-    if (map && map.getLayer("resalte")) {
-      map.setFilter("resalte", ["==", ["get", "m"], ""]);
-    }
+    resaltada = null;
     ficha.hidden = true;
-  }
-  document.getElementById("cerrar").addEventListener("click", soltar);
+    dibujar();
+  });
 
   // En un teléfono las limitaciones plegadas dejan ver el mapa; en escritorio
   // hay lugar de sobra y van abiertas, que es donde corresponde que estén.
@@ -499,12 +740,12 @@ h1 {
     return Math.round((lo / v.length) * 100);
   }
 
-  function mostrar(p) {
-    document.getElementById("fMz").textContent = p.m;
+  function mostrar(f) {
+    document.getElementById("fMz").textContent = f.m;
     ficha.hidden = false;
     hint.style.opacity = "0";
 
-    if (!p.s) {
+    if (!f.s) {
       // Sin habilitaciones en doce años. No es un score bajo: es que no hay con
       // qué calcularlo, y decirlo vale más que mostrar un número inventado.
       document.getElementById("fBarrio").textContent = "Sin actividad comercial registrada";
@@ -517,12 +758,12 @@ h1 {
       return;
     }
 
-    var val = p.s[idx], media = stats[idx].media;
+    var val = f.s[idx], media = stats[idx].media;
     var dif = (val - media) / 10;
-    document.getElementById("fBarrio").textContent = p.b || "Sin barrio asignado";
+    document.getElementById("fBarrio").textContent = f.b || "Sin barrio asignado";
     document.getElementById("fScore").textContent = pct(val);
     document.getElementById("fRubro").textContent = nombre(rubros[idx]);
-    document.getElementById("fHab").textContent = p.n;
+    document.getElementById("fHab").textContent = f.n;
     document.getElementById("fPct").textContent = percentil(val) + "º";
     var d = document.getElementById("fDelta");
     if (Math.abs(dif) < 0.35) {
@@ -533,108 +774,34 @@ h1 {
     }
   }
 
-  function colorExpr() {
-    var s = stats[idx];
-    var valor = ["at", idx, ["get", "s"]];
-    // Las manzanas sin historia comercial van en neutro. Son 12.708 de 19.600,
-    // así que sin este caso el mapa queda lleno de agujeros.
-    return ["case", ["has", "s"],
-      ["interpolate", ["linear"], valor,
-        s.p05, css("--s1"), (s.p05 + s.p50) / 2, css("--s2"),
-        s.p50, css("--s3"),
-        (s.p50 + s.p95) / 2, css("--s4"), s.p95, css("--s5")],
-      css("--sin-datos")];
-  }
-
-  // MapLibre serializa las propiedades que son arrays, así que vuelven como
-  // texto y hay que devolverlas a array antes de indexarlas.
-  function propiedades(rasgo) {
-    var p = rasgo.properties;
-    if (typeof p.s === "string") p.s = JSON.parse(p.s);
-    return p;
-  }
-
   // ------------------------------------------------------------------
-  // Recién ahora el mapa, y con red: si WebGL no está disponible la página
-  // queda usable —los rubros, la escala, los promedios— y dice por qué.
+  // Arranque
   // ------------------------------------------------------------------
-  try {
-    map = new maplibregl.Map({
-      container: "map",
-      style: { version: 8, sources: {}, layers: [] },
-      center: [-64.19, -31.41], zoom: 11.4, minZoom: 9.5, maxZoom: 16,
-      attributionControl: false, dragRotate: false
-    });
-  } catch (e) {
-    avisar("Tu navegador no pudo iniciar el mapa (necesita WebGL). " +
-      "Los rubros y la escala de la izquierda funcionan igual.");
-    return;
-  }
-  map.touchZoomRotate.disableRotation();
-
-  function encuadrar() {
-    map.fitBounds([[-64.32, -31.52], [-64.07, -31.29]], { padding: 24, duration: 0 });
-  }
-
-  map.on("error", function (e) {
-    avisar("El mapa devolvió un error: " + ((e && e.error && e.error.message) || "desconocido"));
-  });
-
-  map.on("load", function () {
-    aviso.hidden = true;
-    map.addSource("mz", { type: "geojson", data: coleccion });
-    map.addLayer({
-      id: "manzanas", type: "fill", source: "mz",
-      paint: { "fill-color": colorExpr(), "fill-opacity": 0.92 }
-    });
-    map.addLayer({
-      id: "bordes", type: "line", source: "mz",
-      paint: { "line-color": css("--ground"), "line-width": 0.5, "line-opacity": 0.55 }
-    });
-    map.addLayer({
-      id: "resalte", type: "line", source: "mz",
-      filter: ["==", ["get", "m"], ""],
-      paint: { "line-color": css("--ink"), "line-width": 2 }
-    });
-    encuadrar();
-  });
+  aviso.hidden = true;
+  ajustar(true);
 
   var tocado = false;
-  map.on("dragstart", function () { tocado = true; });
-  map.on("zoomstart", function (e) { if (e.originalEvent) tocado = true; });
+  lienzo.addEventListener("pointerdown", function () { tocado = true; });
+  lienzo.addEventListener("wheel", function () { tocado = true; });
 
-  // MapLibre dimensiona su canvas una sola vez, al crearse, y el panel donde se
-  // ve esto se agranda y achica a voluntad. Se reencuadra solo mientras el
-  // lector no haya movido el mapa: después, saltarle la vista es una molestia.
   if (window.ResizeObserver) {
     var pendiente;
     new ResizeObserver(function () {
       clearTimeout(pendiente);
-      pendiente = setTimeout(function () {
-        map.resize();
-        if (!tocado) encuadrar();
-      }, 120);
-    }).observe(document.getElementById("map"));
+      // Se reencuadra solo mientras el lector no haya movido el mapa: después,
+      // saltarle la vista al cambiar el tamaño del panel es una molestia.
+      pendiente = setTimeout(function () { ajustar(!tocado); }, 120);
+    }).observe(cont);
+  } else {
+    window.addEventListener("resize", function () { ajustar(!tocado); });
   }
 
-  map.on("mousemove", "manzanas", function (e) {
-    if (fijada) return;
-    map.getCanvas().style.cursor = "pointer";
-    var p = propiedades(e.features[0]);
-    map.setFilter("resalte", ["==", ["get", "m"], p.m]);
-    mostrar(p);
-  });
-  map.on("mouseleave", "manzanas", function () {
-    map.getCanvas().style.cursor = "";
-    if (fijada) return;
-    map.setFilter("resalte", ["==", ["get", "m"], ""]);
-    ficha.hidden = true;
-  });
-  map.on("click", "manzanas", function (e) {
-    var p = propiedades(e.features[0]);
-    fijada = (fijada && fijada.m === p.m) ? null : p;
-    map.setFilter("resalte", ["==", ["get", "m"], fijada ? p.m : ""]);
-    if (fijada) mostrar(p); else ficha.hidden = true;
-  });
+  // El tema puede cambiar mientras la página está abierta, y los colores del
+  // lienzo son valores resueltos, no variables vivas como en CSS.
+  if (window.matchMedia) {
+    var oscuro = window.matchMedia("(prefers-color-scheme: dark)");
+    var alCambiar = function () { leerPaleta(); dibujar(); };
+    if (oscuro.addEventListener) oscuro.addEventListener("change", alCambiar);
+  }
 })();
 </script>
