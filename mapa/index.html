@@ -357,6 +357,7 @@ h1 {
   <p><b>Es predictivo, no causal</b>, y describe el presente: seis hipótesis de trayectoria dieron nulo, así que no dice qué zona va a mejorar. Manzanas sin aperturas recientes se describen con datos más viejos.</p>
 </details>
 
+<script>
 (function () {
   "use strict";
 
@@ -400,41 +401,13 @@ h1 {
   // rellenar, que es lo que hace que 19.600 polígonos se muevan con fluidez.
   // ------------------------------------------------------------------
   var K = 20000; // grados a unidades de mundo
-  var manzanas = [];
-  var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 
-  D.manzanas.forEach(function (m) {
-    var d = m[4], path = new Path2D();
-    var x = 0, y = 0;
-    var bx0 = Infinity, by0 = Infinity, bx1 = -Infinity, by1 = -Infinity;
-    for (var i = 0; i < d.length; i += 2) {
-      x += d[i]; y += d[i + 1];
-      var wx = (x / D.escala) * K;
-      var wy = -(y / D.escala) * K;
-      if (i === 0) path.moveTo(wx, wy); else path.lineTo(wx, wy);
-      if (wx < bx0) bx0 = wx;
-      if (wy < by0) by0 = wy;
-      if (wx > bx1) bx1 = wx;
-      if (wy > by1) by1 = wy;
-    }
-    path.closePath();
-    if (bx0 < minX) minX = bx0;
-    if (by0 < minY) minY = by0;
-    if (bx1 > maxX) maxX = bx1;
-    if (by1 > maxY) maxY = by1;
-    manzanas.push({
-      m: m[0], b: m[1], n: m[2], s: m[3],
-      path: path, bx0: bx0, by0: by0, bx1: bx1, by1: by1
-    });
-  });
-
-  var conScore = manzanas.filter(function (f) { return f.s; });
-
-  // Estadística por rubro: promedio y cortes de la escala. Se calcula acá y no
-  // en el pipeline para que la escala use el contraste real del rubro elegido
-  // en vez de un rango fijo que aplaste a los rubros parejos.
+  // Las estadísticas por rubro salen de los scores crudos, sin tocar la
+  // geometría: así los rubros y la escala aparecen de entrada y no después de
+  // construir 19.600 polígonos, que en un teléfono son varios segundos.
+  var conScore = D.manzanas.filter(function (m) { return m[3]; });
   var stats = rubros.map(function (_, i) {
-    var v = conScore.map(function (f) { return f.s[i]; })
+    var v = conScore.map(function (m) { return m[3][i]; })
       .sort(function (a, b) { return a - b; });
     function q(p) { return v[Math.min(v.length - 1, Math.floor(p * v.length))]; }
     var suma = 0;
@@ -442,30 +415,74 @@ h1 {
     return { orden: v, media: suma / v.length, p05: q(0.05), p50: q(0.5), p95: q(0.95) };
   });
 
+  var manzanas = [];
+  var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  var CELDA = 0;
+  var indice = {};
+  function clave(cx, cy) { return cx + "|" + cy; }
+
+  // La construcción va por tandas, cediendo el hilo entre una y otra. Hecha de
+  // corrido bloquea la pantalla y la página parece colgada — que fue justo lo
+  // que se veía en el teléfono.
+  var TANDA = 2500;
+  function construir(desde, listo) {
+    var hasta = Math.min(desde + TANDA, D.manzanas.length);
+    for (var n = desde; n < hasta; n++) {
+      var m = D.manzanas[n];
+      var d = m[4], path = new Path2D();
+      var x = 0, y = 0;
+      var bx0 = Infinity, by0 = Infinity, bx1 = -Infinity, by1 = -Infinity;
+      for (var i = 0; i < d.length; i += 2) {
+        x += d[i]; y += d[i + 1];
+        var wx = (x / D.escala) * K;
+        var wy = -(y / D.escala) * K;
+        if (i === 0) path.moveTo(wx, wy); else path.lineTo(wx, wy);
+        if (wx < bx0) bx0 = wx;
+        if (wy < by0) by0 = wy;
+        if (wx > bx1) bx1 = wx;
+        if (wy > by1) by1 = wy;
+      }
+      path.closePath();
+      if (bx0 < minX) minX = bx0;
+      if (by0 < minY) minY = by0;
+      if (bx1 > maxX) maxX = bx1;
+      if (by1 > maxY) maxY = by1;
+      manzanas.push({
+        m: m[0], b: m[1], n: m[2], s: m[3],
+        path: path, bx0: bx0, by0: by0, bx1: bx1, by1: by1
+      });
+    }
+    if (hasta < D.manzanas.length) {
+      avisar("Dibujando Córdoba… " + Math.round((hasta / D.manzanas.length) * 100) + "%");
+      setTimeout(function () { construir(hasta, listo); }, 0);
+    } else {
+      indexar();
+      listo();
+    }
+  }
+
+  // Índice espacial para saber qué manzana está bajo el dedo. Probar las 19.600
+  // en cada movimiento sería inviable; la grilla deja dos o tres candidatas y
+  // recién ahí se hace el test exacto de punto en polígono.
+  function indexar() {
+    CELDA = (maxX - minX) / 120;
+    manzanas.forEach(function (f, i) {
+      var cx0 = Math.floor((f.bx0 - minX) / CELDA), cx1 = Math.floor((f.bx1 - minX) / CELDA);
+      var cy0 = Math.floor((f.by0 - minY) / CELDA), cy1 = Math.floor((f.by1 - minY) / CELDA);
+      for (var cx = cx0; cx <= cx1; cx++) {
+        for (var cy = cy0; cy <= cy1; cy++) {
+          var k = clave(cx, cy);
+          (indice[k] || (indice[k] = [])).push(i);
+        }
+      }
+    });
+  }
+
   var idx = 0;
   var fijada = null;
   var resaltada = null;
   var ficha = document.getElementById("ficha");
   var hint = document.getElementById("hint");
-
-  // ------------------------------------------------------------------
-  // Índice espacial para saber qué manzana está bajo el dedo. Probar las 19.600
-  // en cada movimiento sería inviable; una grilla de celdas deja dos o tres
-  // candidatas y recién ahí se hace el test exacto de punto en polígono.
-  // ------------------------------------------------------------------
-  var CELDA = (maxX - minX) / 120;
-  var indice = {};
-  function clave(cx, cy) { return cx + "|" + cy; }
-  manzanas.forEach(function (f, i) {
-    var cx0 = Math.floor((f.bx0 - minX) / CELDA), cx1 = Math.floor((f.bx1 - minX) / CELDA);
-    var cy0 = Math.floor((f.by0 - minY) / CELDA), cy1 = Math.floor((f.by1 - minY) / CELDA);
-    for (var cx = cx0; cx <= cx1; cx++) {
-      for (var cy = cy0; cy <= cy1; cy++) {
-        var k = clave(cx, cy);
-        (indice[k] || (indice[k] = [])).push(i);
-      }
-    }
-  });
 
   // ------------------------------------------------------------------
   // Colores
@@ -716,7 +733,7 @@ h1 {
   pintarLeyenda();
 
   document.getElementById("nSinDatos").textContent =
-    (manzanas.length - conScore.length).toLocaleString("es-AR");
+    (D.manzanas.length - conScore.length).toLocaleString("es-AR");
 
   document.getElementById("cerrar").addEventListener("click", function () {
     fijada = null;
@@ -777,8 +794,10 @@ h1 {
   // ------------------------------------------------------------------
   // Arranque
   // ------------------------------------------------------------------
-  aviso.hidden = true;
-  ajustar(true);
+  construir(0, function () {
+    aviso.hidden = true;
+    ajustar(true);
+  });
 
   var tocado = false;
   lienzo.addEventListener("pointerdown", function () { tocado = true; });
