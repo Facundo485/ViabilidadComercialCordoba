@@ -34,15 +34,20 @@ REGLAS: list[Regla] = [
     (
         "fabricacion",
         MAYORISTA,
-        r"fabricacion|elaboracion de|industrializacion",
+        r"fabricacion|elaboracion de|industrializacion|tostado, torrado",
         r"elaboracion propia",
     ),
     ("deposito", MAYORISTA, r"deposito|almacenamiento", ""),
     # --- Gastronomía
     (
+        # El \b es lo único que separa "panaderías" de "e-m-panaderías": sin él,
+        # las 2.896 habilitaciones de "Bar, confiterías, pizzerías, lomiterías,
+        # empanaderías, parrilla..." caían acá y se llevaban toda la gastronomía
+        # del nomenclador viejo, dejando a `bar_restaurante` con solo el nuevo.
         "panaderia",
         GASTRO,
-        r"panaderia|panificadora|reposteria|horneado de pan|\bpan y productos",
+        r"\bpanaderia|\bpanificadora|reposteria|pasteleria|\bmasas\b|horneado de pan"
+        r"|\bpan y productos",
         "",
     ),
     ("heladeria", GASTRO, r"heladeria|expendio de helados|\bhelados\b", ""),
@@ -52,9 +57,12 @@ REGLAS: list[Regla] = [
         GASTRO,
         r"\bbar\b|\bbares\b|restaurant|cantina|parrilla|pizzeria|lomiteria|trattoria"
         r"|empanaderia|expendio de comidas|servicio de mesa|cerveceria|pub\b",
-        "",
+        # "Servicios de alojamiento en hoteles..." nombra al restaurante del hotel.
+        r"alojamiento",
     ),
-    ("cafeteria", GASTRO, r"cafeteria|\bcafes?\b|confiteria|salon de te|casa de te", ""),
+    # Sin `\bcafes?\b`: matcheaba "venta al por menor de café, té, yerba mate y
+    # especias", que es un almacén de granos, no un café.
+    ("cafeteria", GASTRO, r"cafeteria|confiteria|salon de te|casa de te", ""),
     (
         "comida_para_llevar",
         GASTRO,
@@ -77,11 +85,17 @@ REGLAS: list[Regla] = [
         ALIM,
         r"forrajes|alimento balanceado|animales domesticos|"
         r"productos veterinarios|mascotas|para animales",
+        # La veterinaria es un servicio médico, no un local de venta de forraje.
+        r"servicios medicos para animales|servicios veterinarios",
+    ),
+    (
+        "alimentos_otros",
+        ALIM,
+        r"productos alimenticios|\balimentos\b|pastas frescas|yerba mate",
         "",
     ),
-    ("alimentos_otros", ALIM, r"productos alimenticios|\balimentos\b|pastas frescas", ""),
     # --- Indumentaria
-    ("ropa_infantil", INDUM, r"bebes y ninos|para bebes|infantil", ""),
+    ("ropa_infantil", INDUM, r"bebes y ninos|para bebes|infantil", r"rodados|bicicleta"),
     ("lenceria", INDUM, r"lenceria|ropa interior|\bmedias\b|prendas para dormir", ""),
     ("calzado", INDUM, r"calzado|zapateria|zapatilleria", ""),
     ("marroquineria", INDUM, r"marroquineria|carteras|paraguas|talabarteria", ""),
@@ -139,7 +153,7 @@ REGLAS: list[Regla] = [
         AUTO,
         r"repuestos|partes, piezas|accesorios para vehiculos|\bneumaticos\b|"
         r"\bcubiertas\b|lubricantes",
-        "",
+        r"bicicletas y rodados",
     ),
     (
         "taller_mecanico",
@@ -171,7 +185,7 @@ REGLAS: list[Regla] = [
         r"reparacion de aparatos|reparacion de calzado|cerrajeria|\brelojero\b",
         "",
     ),
-    ("fotocopias", SERVP, r"fotocopiado|preparacion de documentos|\bimprenta\b|grafica", ""),
+    ("fotocopias", SERVP, r"fotocopiado|preparacion de documentos|\bimprenta\b|\bgrafica", ""),
     ("locutorio", SERVP, r"cabinas telefonicas|locutorio|ciber", ""),
     # --- Servicios profesionales
     (
@@ -198,8 +212,10 @@ REGLAS: list[Regla] = [
     (
         "turismo",
         SERVPR,
-        r"agencias de turismo|agencias de viajes|\bturismo\b|\bhotel\b|hospedaje|\bhosteria\b",
-        "",
+        r"agencias de turismo|agencias de viajes|\bturismo\b|\bhotel|hospedaje"
+        r"|\bhosteria|alojamiento",
+        # El geriátrico también da alojamiento y no es turismo.
+        r"ancianos|adultos mayores",
     ),
     ("seguros", SERVPR, r"\bseguros\b|productor asesor", ""),
     (
@@ -211,11 +227,14 @@ REGLAS: list[Regla] = [
     # --- Esparcimiento
     ("juegos_azar", ESPAR, r"quiniela|loteria|\bbingo\b|quini|juegos de azar|apuestas", ""),
     ("jugueteria", ESPAR, r"jugueteria|\bjuguetes\b|cotillon|juegos de mesa", ""),
+    # Estaban juntos bajo el rótulo "espectaculos", y el 98% del volumen eran
+    # canchas de paddle y fútbol. Un salón de fiestas y una cancha no tienen la
+    # misma vida útil, así que van separados aunque espectáculos quede chico.
+    ("instalaciones_deportivas", ESPAR, r"instalaciones deportivas|\bcanchas?\b", ""),
     (
         "espectaculos",
         ESPAR,
-        r"instalaciones deportivas|\bcine\b|\bteatro\b|\bboliche\b|"
-        r"salon de fiestas|espectaculo|\bcanchas?\b",
+        r"\bcine\b|\bteatro\b|\bboliche\b|salon de fiestas|espectaculo",
         "",
     ),
     ("deportes", ESPAR, r"articulos deportivos|\bpesca\b|\bcaza\b|camping", ""),

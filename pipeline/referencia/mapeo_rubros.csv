@@ -31,7 +31,7 @@ VENTA AL POR MENOR DE ARTÍCULOS NUEVOS N.C.P.,1181,comercio_otros,comercio gene
 Venta al por menor de panificadoras y panaderías,1085,panaderia,gastronomia
 "VENTA AL POR MENOR DE HUEVOS, CARNE DE AVES Y PRODUCTOS DE GRANJA Y DE LA CAZA",1005,polleria,alimentos
 "VENTA AL POR MENOR DE PRODUCTOS COSMÉTICOS, DE TOCADOR Y DE PERFUMERÍA",980,perfumeria,salud
-"Bar, confiterías, pizzerías, lomiterías, empanaderías, parrilla, trattoría, confiterías y restaurantes con una superficie habilitada hasta 100 m2.-",974,panaderia,gastronomia
+"Bar, confiterías, pizzerías, lomiterías, empanaderías, parrilla, trattoría, confiterías y restaurantes con una superficie habilitada hasta 100 m2.-",974,bar_restaurante,gastronomia
 "Venta al por menor de repuestos y accesorios para vehículos automotores, incluido equipos de G.N.C.",971,repuestos,automotor
 PELUQUERÍAS INSTALADAS FUERA DEL PERÍMETRO Y TRAMOS ESTABLECIDOS POR EL ARTÍCULO 142° DE LA ORDENANZA TRIBUTARIA 2011,900,peluqueria,servicios personales
 Servicio de fotocopiado. Fotocopiadoras,897,fotocopias,servicios personales
@@ -68,7 +68,7 @@ FIAMBRERIA. VENTA AL POR MENOR DE FIAMBRES.,543,fiambreria,alimentos
 Venta al por menor de artículos de caña y mimbre. Venta de muebles. Mueblería,528,muebleria,hogar y construccion
 "VENTA AL POR MENOR DE PRODUCTOS VETERINARIOS, ANIMALES DOMÉSTICOS Y ALIMENTO BALANCEADO PARA MASCOTAS",515,forrajeria,alimentos
 Venta al por menor de herboristería,509,dietetica,alimentos
-"Bar, confiterías, pizzerías, lomiterías, empanaderías, parrilla, trattoría, confiterías y restaurantes con una superficie habilitada desde 101 m2 a 200 m2.",503,panaderia,gastronomia
+"Bar, confiterías, pizzerías, lomiterías, empanaderías, parrilla, trattoría, confiterías y restaurantes con una superficie habilitada desde 101 m2 a 200 m2.",503,bar_restaurante,gastronomia
 VENTA AL POR MENOR DE PRODUCTOS LÁCTEOS,497,lacteos,alimentos
 "VENTA AL POR MENOR DE BOMBONES, GOLOSINAS Y DEMÁS PRODUCTOS DE CONFITERÍA",494,golosinas,alimentos
 Venta al por menor de artículos de lencería,484,lenceria,indumentaria
@@ -92,7 +92,7 @@ VENTA AL POR MENOR DE INDUMENTARIA DEPORTIVA,375,indumentaria_deportiva,indument
 Venta al por menor de artículos de mercería,372,merceria,indumentaria
 Depósitos y almacenamientos de alimentos no refrigerados,368,deposito,industria y deposito
 Gimnasios,362,gimnasio,servicios personales
-SERVICIOS MÉDICOS PARA ANIMALES (VETERINARIA),355,forrajeria,alimentos
+SERVICIOS MÉDICOS PARA ANIMALES (VETERINARIA),355,veterinaria,salud
 VENTA AL POR MENOR DE MEDICAMENTOS DE USO HUMANO (FARMACIAS),354,farmacia,salud
 Venta por menor de Insumos de computación,352,tecnologia,comercio general
 Venta al por menor de artículos del hogar,351,articulos_hogar,hogar y construccion
@@ -107,7 +107,7 @@ Venta de helados envasados,328,heladeria,gastronomia
 "VENTA AL POR MENOR DE MUEBLES PARA EL HOGAR, ARTÍCULOS DE MIMBRE Y CORCHO",326,muebleria,hogar y construccion
 Reparación de aparatos eléctricos de uso doméstico y personal,326,reparaciones,servicios personales
 SERVICIOS EMPRESARIALES N.C.P.,325,oficina,servicios profesionales
-"Bar, confiterías, pizzerías, lomiterías, empanaderías, parrilla, trattoría, confiterías y restaurantes con una superficie habilitada de más de 300 m2. -",323,panaderia,gastronomia
+"Bar, confiterías, pizzerías, lomiterías, empanaderías, parrilla, trattoría, confiterías y restaurantes con una superficie habilitada de más de 300 m2. -",323,bar_restaurante,gastronomia
 VENTA AL POR MENOR DE ARTÍCULOS DE ÓPTICA Y FOTOGRAFÍA,320,optica,salud
 "SERVICIOS DE TRATAMIENTO DE BELLEZA, EXCEPTO LOS DE PELUQUERÍA",313,consultorio,salud
 "Sandwichería, elaboración y ventas por menor, sin servicios de mesas",311,comida_para_llevar,gastronomia
@@ -127,7 +127,7 @@ VENTA POR MENOR DE MEDICAMENTOS Y ACCESORIOS PARA ANIMALES,264,forrajeria,alimen
 Servicios prestados a las empresas por profesionales organizados como empresa en ejercicio de su profesión liberal,262,oficina,servicios profesionales
 VENTA AL POR MENOR DE TABACO EN COMERCIOS ESPECIALIZADOS,255,tabaqueria,comercio general
 SERVICIOS MINORISTAS DE AGENCIAS DE VIAJES,252,turismo,servicios profesionales
-"Bar, confiterías, pizzerías, lomiterías, empanaderías, parrilla, trattoría, confiterías y restaurantes con una superficie habilitada desde 101 m2 a 200 m2. Ubicados dentro de los siguientes perímetros:",250,panaderia,gastronomia
+"Bar, confiterías, pizzerías, lomiterías, empanaderías, parrilla, trattoría, confiterías y restaurantes con una superficie habilitada desde 101 m2 a 200 m2. Ubicados dentro de los siguientes perímetros:",250,bar_restaurante,gastronomia
 Venta al por menor de pastas frescas,249,alimentos_otros,alimentos
 Desarrollo de software,249,oficina,servicios profesionales
 VENTA AL POR MENOR DE ARTÍCULOS PARA EL HOGAR N.C.P.,248,articulos_hogar,hogar y construccion
@@ -137,7 +137,7 @@ VENTA AL POR MENOR DE ARTÍCULOS PARA EL HOGAR N.C.P.,248,articulos_hogar,hogar 
 Peluquería canina,245,peluqueria,servicios personales
 Agente de seguros y servicios relacionados con seguros n.c.p.,236,seguros,servicios profesionales
 VENTA AL POR MENOR DE PRODUCTOS FARMACÉUTICOS Y HERBORISTERÍA,236,dietetica,alimentos
-"Bar, confiterías, pizzerías, lomiterías, empanaderías, parrilla, trattoría, confiterías y restaurantes con una superficie habilitada hasta 100 m2. Ubicados dentro de los siguientes perímetros:",235,panaderia,gastronomia
+"Bar, confiterías, pizzerías, lomiterías, empanaderías, parrilla, trattoría, confiterías y restaurantes con una superficie habilitada hasta 100 m2. Ubicados dentro de los siguientes perímetros:",235,bar_restaurante,gastronomia
 SERVICIOS VETERINARIOS,235,veterinaria,salud
 SERVICIOS DE AGENCIAS DE COBRO Y CALIFICACIÓN CREDITICIA,232,cobranzas,servicios profesionales
 Minimercado,231,almacen,alimentos
@@ -147,8 +147,8 @@ SERVICIOS DE ACONDICIONAMIENTO FÍSICO,231,gimnasio,servicios personales
 Venta al por menor de tabacos y cigarrillos,227,tabaqueria,comercio general
 "VENTA AL POR MENOR DE ELECTRODOMÉSTICOS, ARTEFACTOS PARA EL HOGAR Y EQUIPOS DE AUDIO Y VIDEO",226,electrodomesticos,hogar y construccion
 "Venta al por menor de artículos electrónicos, sus repuestos y accesorios (excepto del hogar)",225,repuestos,automotor
-"Bar, confiterías, pizzerías, lomiterías, empanaderías, parrilla, trattoría, confiterías y restaurantes con una superficie habilitada desde 201 m2 a 300 m2.-",220,panaderia,gastronomia
-"Bar, confiterías, pizzerías, lomiterías, empanaderías, parrilla, trattoría, confiterías y restaurantes. Ubicados dentro de shoppings, grandes centros comerciales, galerías y patios de comida.",216,panaderia,gastronomia
+"Bar, confiterías, pizzerías, lomiterías, empanaderías, parrilla, trattoría, confiterías y restaurantes con una superficie habilitada desde 201 m2 a 300 m2.-",220,bar_restaurante,gastronomia
+"Bar, confiterías, pizzerías, lomiterías, empanaderías, parrilla, trattoría, confiterías y restaurantes. Ubicados dentro de shoppings, grandes centros comerciales, galerías y patios de comida.",216,bar_restaurante,gastronomia
 "VENTA AL POR MENOR DE EQUIPOS, PERIFÉRICOS, ACCESORIOS Y PROGRAMAS INFORMÁTICOS",213,tecnologia,comercio general
 ELABORACIÓN DE PRODUCTOS DE PANADERÍA N.C.P.,212,fabricacion,industria y deposito
 Depósitos y almacenamientos de alimentos refrigerados,210,deposito,industria y deposito
@@ -167,8 +167,8 @@ VENTA AL POR MENOR DE MATERIALES DE CONSTRUCCIÓN N.C.P.,180,construccion,hogar 
 SERVICIOS RELACIONADOS CON LA SALUD HUMANA N.C.P.,179,consultorio,salud
 VENTA AL POR MENOR DE COLCHONES Y SOMIERES,179,muebleria,hogar y construccion
 Lotería instantánea,178,juegos_azar,esparcimiento
-"EXPLOTACIÓN DE INSTALACIONES DEPORTIVAS, EXCEPTO CLUBES",177,espectaculos,esparcimiento
-Venta al por menor de masas y demás productos de pastelerías. Confiterías,177,cafeteria,gastronomia
+"EXPLOTACIÓN DE INSTALACIONES DEPORTIVAS, EXCEPTO CLUBES",177,instalaciones_deportivas,esparcimiento
+Venta al por menor de masas y demás productos de pastelerías. Confiterías,177,panaderia,gastronomia
 "VENTA AL POR MENOR DE HILADOS, TEJIDOS Y ARTÍCULOS DE MERCERÍA",176,merceria,indumentaria
 Venta al por menor de materiales de construcción,175,construccion,hogar y construccion
 Bancos                                                                                                                                                                                                                                            Con un mínimo,174,cobranzas,servicios profesionales
@@ -185,7 +185,7 @@ Venta al por menor de artículos de plástico,140,otro,otro
 Venta al por menor de prendas de vestir de cuero y sucedáneos,137,ropa,indumentaria
 VENTA AL POR MENOR DE INSUMOS MÉDICOS,136,otro,otro
 VENTA AL POR MENOR DE PESCADOS Y PRODUCTOS DE LA PESCA,136,pescaderia,alimentos
-"Venta al por menor de bicicletas y rodados infantiles, sus repuestos y accesorios",136,ropa_infantil,indumentaria
+"Venta al por menor de bicicletas y rodados infantiles, sus repuestos y accesorios",136,venta_vehiculos,automotor
 "VENTA AL POR MENOR DE PRODUCTOS COSMÉTICOS, DE TOCADOR Y DE PERFUMERÍA, PAÑALES",133,perfumeria,salud
 "Fraccionamiento, distribución y venta por mayor de productos alimentarios n.c.p.",132,mayorista,industria y deposito
 Salón de belleza,130,otro,otro
@@ -194,9 +194,9 @@ Venta al por menor de pañales,129,otro,otro
 "MANTENIMIENTO Y REPARACIÓN DEL MOTOR N.C.P., MECÁNICA INTEGRAL",129,taller_mecanico,automotor
 "Venta al por menor de discos, cassettes, DVD, DVC, videos juegos y similares. Disquerías",128,otro,otro
 ESCUELA DE DANZAS Y YOGA,127,otro,otro
-"Venta al por menor de café, te, yerba mate y especias",127,cafeteria,gastronomia
+"Venta al por menor de café, te, yerba mate y especias",127,alimentos_otros,alimentos
 VENTA AL POR MENOR DE ARTÍCULOS DE TALABARTERÍA Y ARTÍCULOS REGIONALES,126,marroquineria,indumentaria
-"Bar, confiterías, pizzerías, lomiterías, empanaderías, parrilla, trattoría, confiterías y restaurantes con una superficie habilitada desde 201 m2 a 300 m2. Ubicados dentro de los siguientes perímetros:",126,panaderia,gastronomia
+"Bar, confiterías, pizzerías, lomiterías, empanaderías, parrilla, trattoría, confiterías y restaurantes con una superficie habilitada desde 201 m2 a 300 m2. Ubicados dentro de los siguientes perímetros:",126,bar_restaurante,gastronomia
 "VENTA AL POR MENOR  DE ELECTRODOMÉSTICOS, ARTEFACTOS PARA EL HOGAR Y EQUIPOS DE AUDIO Y VIDEO",126,electrodomesticos,hogar y construccion
 Instituto de higiene y estética corporal,126,belleza,servicios personales
 SERVICIOS DE COMIDAS N.C.P.,125,otro,otro
@@ -355,13 +355,13 @@ Venta al por mayor de artículos de librería y papelería,54,mayorista,industri
 Venta  por menor de vehículos automotores nuevos,54,otro,otro
 Recarga y venta al por menor de garrafas y combustibles sólidos y líquidos,54,otro,otro
 "Instalación y reparación de lunetas y ventanillas, sistema de climatización, grabado de cristales de automotores, polarizados,",53,otro,otro
-Reparación de bicicletas y rodados infantiles,53,ropa_infantil,indumentaria
+Reparación de bicicletas y rodados infantiles,53,venta_vehiculos,automotor
 Natatorios,53,otro,otro
 Venta de automotores nuevos por comisiones o consignaciones. Incluye planes de ahorro,53,venta_vehiculos,automotor
 VENTA AL POR MAYOR DE COMBUSTIBLES Y LUBRICANTES PARA AUTOMOTORES,52,mayorista,industria y deposito
 "Fabricación de muebles, sus partes y accesorios, excepto metálicos y plásticos",52,fabricacion,industria y deposito
 FABRICACIÓN DE PRODUCTOS ELABORADOS DE METAL N.C.P.,51,fabricacion,industria y deposito
-"SERVICIOS DE ALOJAMIENTO EN HOTELES, HOSTERÍAS Y RESIDENCIALES SIMILARES, EXCEPTO POR HORA, QUE NO INCLUYEN SERVICIO DE RESTAURANTE AL PÚBLICO",51,bar_restaurante,gastronomia
+"SERVICIOS DE ALOJAMIENTO EN HOTELES, HOSTERÍAS Y RESIDENCIALES SIMILARES, EXCEPTO POR HORA, QUE NO INCLUYEN SERVICIO DE RESTAURANTE AL PÚBLICO",51,turismo,servicios profesionales
 Venta al por menor de materiales de construcción en medianas y grandes superficies,51,construccion,hogar y construccion
 VENTA AL POR MENOR POR INTERNET,51,otro,otro
 "FABRICACIÓN DE PARTES, PIEZAS Y ACCESORIOS PARA VEHÍCULOS AUTOMOTORES Y SUS MOTORES N.C.P.",51,fabricacion,industria y deposito
@@ -372,7 +372,7 @@ VENTA AL POR MAYOR DE MATERIALES Y PRODUCTOS DE LIMPIEZA,50,mayorista,industria 
 PRODUCCIÓN Y PROCESAMIENTO DE CARNE DE AVES,50,polleria,alimentos
 Compra y venta de artículos del hogar y muebles,50,muebleria,hogar y construccion
 VENTA AL POR MENOR DE EQUIPOS  Y ARTÍCULOS DEPORTIVOS,49,deportes,esparcimiento
-"Bar, confiterías, pizzerías, lomiterías, empanaderías, parrilla, trattoría, confiterías y restaurantes con una superficie habilitada de más de 300 m2. Ubicados dentro de los siguientes perímetros:",49,panaderia,gastronomia
+"Bar, confiterías, pizzerías, lomiterías, empanaderías, parrilla, trattoría, confiterías y restaurantes con una superficie habilitada de más de 300 m2. Ubicados dentro de los siguientes perímetros:",49,bar_restaurante,gastronomia
 SERVICIOS DE PUBLICIDAD N.C.P.,49,otro,otro
 FABRICACIÓN DE PRODUCTOS METÁLICOS DE TORNERÍA Y/O MATRICERÍA,49,fabricacion,industria y deposito
 "Servicios relacionados con la imprenta (electrotipia, composición de tipo, grabado)",49,fotocopias,servicios personales
@@ -510,7 +510,7 @@ VENTA AL POR MAYOR DE ARTÍCULOS DE PLÁSTICO,27,mayorista,industria y deposito
 "LAVADO Y LIMPIEZA DE ARTÍCULOS DE TELA, CUERO Y/O DE PIEL, INCLUSO LA LIMPIEZA EN SECO",27,limpieza,hogar y construccion
 Servicios odontológicos.,27,consultorio,salud
 Venta al por mayor de productos lácteos (excepto quesos),27,mayorista,industria y deposito
-"DE LAS CANCHAS DE TENIS, PADDLE TENIS, SQUASH, FRONTÓN, PELOTA A PALETA, FUTBOL 5,9,11, FUTBOL DE SALÓN, BASQUET Y OTRAS. CON ESCUELAS Y/O DE ALQUILER",26,espectaculos,esparcimiento
+"DE LAS CANCHAS DE TENIS, PADDLE TENIS, SQUASH, FRONTÓN, PELOTA A PALETA, FUTBOL 5,9,11, FUTBOL DE SALÓN, BASQUET Y OTRAS. CON ESCUELAS Y/O DE ALQUILER",26,instalaciones_deportivas,esparcimiento
 SERVICIOS RELACIONADOS CON LA CONSTRUCCIÓN.,26,otro,otro
 Venta al por mayor de productos farmacéuticos y veterinarios,26,mayorista,industria y deposito
 ENSEÑANZA ESPECIAL Y PARA DISCAPACITADOS,26,educacion,educacion
@@ -558,7 +558,7 @@ FABRICACIÓN DE EQUIPO MÉDICO Y QUIRÚRGICO Y DE APARATOS ORTOPÉDICOS N.C.P.,2
 "VENTA AL POR MENOR DE PARTES, PIEZAS Y ACCESORIOS USADOS N.C.P.",21,repuestos,automotor
 REPARACIÓN DE CALZADO Y ARTÍCULOS DE MARROQUINERÍA,21,calzado,indumentaria
 "Servicios de hospital de día. (Incluye las actividades de tratamiento que no necesitan hospitalización a tiempo completo, tales como tratamientos oncológicos; infectológicos; dialíticos; atención de la salud mental; atención pediátrica; atención gerontoló",21,otro,otro
-"SERVICIOS DE ALOJAMIENTO EN HOTELES, HOSTERÍAS Y RESIDENCIALES SIMILARES, EXCEPTO POR HORA, QUE INCLUYEN SERVICIO DE RESTAURANTE AL PÚBLICO",21,bar_restaurante,gastronomia
+"SERVICIOS DE ALOJAMIENTO EN HOTELES, HOSTERÍAS Y RESIDENCIALES SIMILARES, EXCEPTO POR HORA, QUE INCLUYEN SERVICIO DE RESTAURANTE AL PÚBLICO",21,turismo,servicios profesionales
 SERVICIOS DE ENTIDADES DE TARJETA DE COMPRA Y/O CRÉDITO,21,otro,otro
 VENTA AL POR MENOR DE EQUIPOS  Y ARTÍCULOS DEPORTIVOS ,21,deportes,esparcimiento
 "SERVICIOS DE ORGANIZACIÓN DE CONVENCIONES Y EXPOSICIONES COMERCIALES, EXCEPTO CULTURALES Y DEPORTIVOS",21,otro,otro
@@ -673,7 +673,7 @@ Venta al por mayor de vidrios planos y templados,12,mayorista,industria y deposi
 "Venta al por mayor  de joyas, relojes y artículos conexos",12,mayorista,industria y deposito
 Venta por mayor de semillas,12,mayorista,industria y deposito
 Venta al por menor de productos de caucho n.c.p.,12,otro,otro
-"Tostado, torrado y molienda de café",12,cafeteria,gastronomia
+"Tostado, torrado y molienda de café",12,fabricacion,industria y deposito
 Supermercado una superficie total superior a 2.001 m2,12,almacen,alimentos
 SERVICIOS DE LOCUTORIOS,12,locutorio,servicios personales
 "VENTA AL POR MAYOR DE ARTÍCULOS DE RELOJERÍA, JOYERÍA Y FANTASÍAS",12,mayorista,industria y deposito
@@ -817,7 +817,7 @@ SERVICIOS DE TURISMO AVENTURA,8,turismo,servicios profesionales
 "Fabricación de productos de cuero y sucedáneos de cuero (excepto calzado y prendas vestir). Incluye maletas, bolsos de mano y similares, artículos de talabartería y de cuero n.c.p.",8,fabricacion,industria y deposito
 "Fabricación de motocicletas, vehículos similares y sus partes, incluyendo el motor",8,fabricacion,industria y deposito
 "Hotel categoría 4 estrellas. Con un mínimo por cada habitación de $ 32,75.-",8,turismo,servicios profesionales
-"TOSTADO, TORRADO Y MOLIENDA DE CAFÉ",8,cafeteria,gastronomia
+"TOSTADO, TORRADO Y MOLIENDA DE CAFÉ",8,fabricacion,industria y deposito
 SERVICIOS DE TELECOMUNICACIÓN VÍA INTERNET N.C.P.,8,otro,otro
 Tapizado y retapizado de automotores,8,otro,otro
 "FABRICACIÓN DE MOTORES, GENERADORES Y TRANSFORMADORES ELÉCTRICOS",8,fabricacion,industria y deposito
@@ -866,7 +866,7 @@ SERVICIOS DE GESTIÓN DE FONDOS A CAMBIO DE UNA RETRIBUCIÓN O POR CONTRATA,7,co
 Servicios de atención domiciliaria programada. (Incluye las actividades llevadas a cabo en establecimientos que ofrecen atención por módulos a domicilio y actividades de agentes sanitarios relacionados con la prevención y educación para la salud).,7,construccion,hogar y construccion
 VENTA AL POR MENOR DE OBRAS DE ARTE,7,otro,otro
 "Instalación de ascensores, montacargas, escaleras mecánicas,",6,otro,otro
-SERVICIOS SOCIALES SIN ALOJAMIENTO,6,otro,otro
+SERVICIOS SOCIALES SIN ALOJAMIENTO,6,turismo,servicios profesionales
 CONFECCIÓN DE PRENDAS DEPORTIVAS,6,otro,otro
 "FABRICACIÓN DE COSMÉTICOS, PERFUMES Y PRODUCTOS DE HIGIENE Y TOCADOR",6,fabricacion,industria y deposito
 Alquiler de equipo de construcción o demolición,6,otro,otro
@@ -892,7 +892,7 @@ COLOCACIÓN DE CRISTALES EN OBRA,6,otro,otro
 FABRICACIÓN DE MÁQUINAS HERRAMIENTA,6,fabricacion,industria y deposito
 "Fraccionamiento, distribución y venta al por mayor de aditivos y lubricantes",6,mayorista,industria y deposito
 ARRENDAMIENTO Y GESTIÓN DE BIENES INTANGIBLES NO FINANCIEROS,6,otro,otro
-"SERVICIOS DE ATENCIÓN A PERSONAS CON PROBLEMAS DE SALUD MENTAL O DE ADICCIONES, CON ALOJAMIENTO",6,otro,otro
+"SERVICIOS DE ATENCIÓN A PERSONAS CON PROBLEMAS DE SALUD MENTAL O DE ADICCIONES, CON ALOJAMIENTO",6,turismo,servicios profesionales
 "Venta al por mayor de papeles para pared, revestimiento para pisos de goma, plástico y textiles, y artículos similares para la decoración",6,mayorista,industria y deposito
 "fabricación de cerraduras, llaves, herrajes y otros artículos de ferretería incluyendo clavos y bulones",6,fabricacion,industria y deposito
 "CONSTRUCCIÓN, REFORMA Y REPARACIÓN DE OBRAS HIDRÁULICAS",6,otro,otro
@@ -930,9 +930,9 @@ Fabricación y reparación de acondicionadores de aire,5,fabricacion,industria y
 Fundición de metales no ferrosos,5,otro,otro
 FABRICACIÓN DE PRODUCTOS DE LABORATORIO Y PRODUCTOS BOTÁNICOS DE USO FARMACEÚTICO N.C.P.,5,fabricacion,industria y deposito
 VENTA AL POR MAYOR DE BICICLETAS Y RODADOS SIMILARES,5,mayorista,industria y deposito
-Producción de películas cinematográficas y de televisión,5,fotocopias,servicios personales
+Producción de películas cinematográficas y de televisión,5,otro,otro
 "Construcción y reparación de embarcaciones, incluye buques, yates, veleros, botes,  Astilleros",5,otro,otro
-Elaboración y molienda de yerba mate (incluye concentrados),5,otro,otro
+Elaboración y molienda de yerba mate (incluye concentrados),5,alimentos_otros,alimentos
 SERVICIO COMBINADO DE APOYO A EDIFICIOS,5,otro,otro
 Editoriales sin imprenta,5,fotocopias,servicios personales
 "VENTA AL POR MAYOR EN COMISIÓN O CONSIGNACIÓN DE PROD. TEXTILES, PRENDAS DE VESTIR, CALZADO EXCEPTO EL ORTOPÉDICO, ART.DE MARROQUINERÍA, PARAGUAS Y SIMILARES Y PROD.DE CUERO N.C.P",5,mayorista,industria y deposito
@@ -1052,7 +1052,7 @@ SERVICIOS DE MANIPULACIÓN DE CARGA EN EL ÁMBITO TERRESTRE,3,otro,otro
 MOLIENDA DE TRIGO,3,otro,otro
 SERVICIOS GEOLÓGICOS Y DE PROSPECCIÓN,3,otro,otro
 VENTA AL POR MAYOR EN COMISIÓN O CONSIGNACIÓN DE SEMILLAS,3,mayorista,industria y deposito
-SERVICIOS DE ALOJAMIENTO EN PENSIONES,3,otro,otro
+SERVICIOS DE ALOJAMIENTO EN PENSIONES,3,turismo,servicios profesionales
 Fabricación de plaguicidas (incluye los biológicos),3,fabricacion,industria y deposito
 "POR CADA ESPACIO DESTINADO A GARAGES, PLAYAS DE ESTACIONAMIENTO, GUARDACOCHES, UBICADOS DENTRO DEL PERÍMETRO COMPRENDIDO POR LAS CALLES: FIGUEROA ALCORTA, MARCELO T. DE ALVEAR, AV. PUEYRREDÓN, MANUEL ESTRADA, AV. POETA LUGONES, BV PERÓN, SARMIENTO, HUMBER",3,otro,otro
 FABRICACIÓN DE COMPONENTES ELECTRÓNICOS,3,fabricacion,industria y deposito
@@ -1122,7 +1122,7 @@ FABRICACIÓN DE JABONES Y DETERGENTES,3,fabricacion,industria y deposito
 Fabricación de lámparas y tubos eléctricos,2,fabricacion,industria y deposito
 "VENTA AL POR MAYOR EN COMISIÓN O CONSIGNACIÓN DE  MAQUINARIA, EQUIPO PROFESIONAL INDUSTRIAL Y COMERCIAL, EMBARCACIONES Y AERONAVES",2,mayorista,industria y deposito
 FABRICACIÓN Y ELABORACIÓN DE VIDRIO PLANO,2,fabricacion,industria y deposito
-SERVICIOS DE ALOJAMIENTO POR HORA,2,otro,otro
+SERVICIOS DE ALOJAMIENTO POR HORA,2,turismo,servicios profesionales
 FABRICACIÓN DE MAQUINARIA Y EQUIPO DE USO ESPECIAL N.C.P.,2,fabricacion,industria y deposito
 VENTA AL POR MAYOR DE ABERTURAS,2,mayorista,industria y deposito
 SERVICIOS DE GESTIÓN ADUANERA REALIZADOS POR DESPACHANTES DE ADUANA,2,otro,otro
@@ -1202,7 +1202,7 @@ ELABORACIÓN DE PRODUCTOS LÁCTEOS N.C.P.,2,fabricacion,industria y deposito
 FABRICACIÓN DE MEDICAMENTOS PARA USO VETERINARIO,2,fabricacion,industria y deposito
 Fabricación de cigarrillos,2,fabricacion,industria y deposito
 CULTIVO DE HORTALIZAS DE HOJA Y DE OTRAS HORTALIZAS FRESCAS,2,verduleria,alimentos
-SERVICIOS DE ATENCIÓN A PERSONAS MINUSVÁLIDAS CON ALOJAMIENTO,2,otro,otro
+SERVICIOS DE ATENCIÓN A PERSONAS MINUSVÁLIDAS CON ALOJAMIENTO,2,turismo,servicios profesionales
 Fabricación de instrumentos de óptica,2,fabricacion,industria y deposito
 Venta al por mayor de pieles y cueros,2,mayorista,industria y deposito
 Fabricación de hielo natural y jugos envasados para diluir,2,fabricacion,industria y deposito
@@ -1359,7 +1359,7 @@ VENTA AL POR MAYOR DE FLORES Y PLANTAS NATURALES Y ARTIFICIALES,1,mayorista,indu
 SERVICIOS DE INTERMEDIACIÓN FINANCIERA REALIZADA POR SOCIEDADES DE AHORRO Y PRÉSTAMO PARA LA VIVIENDA Y OTROS INMUEBLES,1,cobranzas,servicios profesionales
 Fabricación de papel y cartón,1,fabricacion,industria y deposito
 FABRICACIÓN DE OBJETOS CERÁMICOS PARA USO DOMÉSTICO EXCEPTO ARTEFACTOS SANITARIOS,1,fabricacion,industria y deposito
-Distribución y alquiler de películas cinematográficas,1,fotocopias,servicios personales
+Distribución y alquiler de películas cinematográficas,1,otro,otro
 "EXTRACCIÓN DE ARENAS, CANTO RODADO Y TRITURADOS PÉTREOS",1,otro,otro
 DESCONTAMINACIÓN Y OTROS SERVICIOS DE GESTIÓN DE RESIDUOS,1,otro,otro
 SERVICIOS DE SEGUROS PERSONALES EXCEPTO  LOS DE SALUD Y DE VIDA,1,seguros,servicios profesionales

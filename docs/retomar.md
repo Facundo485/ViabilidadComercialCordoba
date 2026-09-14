@@ -88,7 +88,7 @@ llamativo, buscar primero el artefacto.
 
 ---
 
-## Hallazgo del 13/09: el outlier era taxonomía, no censura
+## Arreglado: el outlier era taxonomía, no censura
 
 `bar_restaurante` daba 95% porque **su gemelo viejo está clasificado como
 panadería**. El nomenclador municipal mete toda la gastronomía en una entrada
@@ -115,8 +115,45 @@ ANIMALES (VETERINARIA)" (355) mientras `veterinaria` existe aparte con 235; y
 `espectaculos` es en realidad instalaciones deportivas (canchas de paddle,
 tenis, fútbol).
 
-**Arreglar el mapeo es probablemente la mitad del Paso 2b**, y se hace editando
-`referencia/mapeo_rubros.csv` fila por fila, que es para lo que existe ese CSV.
+**Arreglado en las reglas de `rubros.py`, no a mano en el CSV:** los errores
+eran sistemáticos (un regex sin `\b` afecta a todas las variantes), así que
+editar filas sueltas los habría dejado volver en la próxima regeneración.
+
+Se movieron **4.063 habilitaciones en 26 entradas**:
+
+```
+2896  panaderia      -> bar_restaurante    (el \b de "empanaderías")
+ 355  forrajeria     -> veterinaria        (servicio médico, no venta de forraje)
+ 203  espectaculos   -> instalaciones_deportivas
+ 189  ropa_infantil  -> venta_vehiculos    ("rodados infantiles" son bicicletas)
+ 324  cafeteria      -> panaderia / alimentos_otros / fabricacion
+  91  bar_rest/otro  -> turismo            (hoteles que nombran su restaurante)
+```
+
+Y uno que encontró el test general, no yo: "cinemato**gráfica**s" caía en
+`fotocopias` por el regex `grafica` sin `\b`.
+
+`cafeteria` quedó en **cero**: nunca fue una categoría real, era contenido mal
+ruteado. `espectaculos` quedó en 4 — el 98% de ese rubro eran canchas de paddle
+y fútbol.
+
+**Qué mejoró, medido:**
+
+| | antes | después |
+|---|---|---|
+| `s5` vs año mediano del rubro | 0,712 | **0,641** |
+| ídem, cohortes alta ≤2019 | 0,581 | **0,453** |
+| `s5` vs proporción de nomenclador nuevo (cohortes) | 0,569 | **0,254** |
+| rubros segregados por nomenclador | 13 de 73 | **11 de 72** |
+| `bar_restaurante` | 1.598 spells, s5 95,3% | **4.088 spells, s5 39,3%** |
+
+El outlier imposible desapareció y el chequeo de dominio ahora pasa por la razón
+correcta: gastronomía 40,1% contra farmacia 43,5%, con `bar_restaurante` adentro
+de gastronomía y con volumen real.
+
+**Sigue abierto:** 0,45 de correlación con la época no es cero. Quedan los dos
+puntos de abajo —estratificar por cohorte y meter el año en un Cox— y los 11
+rubros que todavía existen bajo un solo nomenclador.
 
 ---
 

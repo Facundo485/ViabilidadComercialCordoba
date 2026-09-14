@@ -156,10 +156,18 @@ rubros, nunca de titulares.
 municipal viejo (Título, con acentos) y el CLANAE/CIIU nuevo (MAYÚSCULAS), con
 variantes del mismo concepto que a veces solo difieren en un espacio doble.
 
-Se agrupan en dos niveles: **76 rubros de nivel 2** dentro de **12 grupos de
-nivel 1**, que cubren el 93,4% de las habilitaciones. 72 de los 76 superan las
+Se agrupan en dos niveles: **75 rubros de nivel 2** dentro de **12 grupos de
+nivel 1**, que cubren el 93,3% de las habilitaciones. 71 de los 75 superan las
 200 habilitaciones, que es del orden de los 100 cierres que necesita un modelo
 con ~10 variables.
+
+**Las reglas son el lugar donde se corrige, no el CSV.** El CSV sigue siendo lo
+que lee el pipeline, pero los errores que aparecieron eran sistemáticos —un
+regex sin `\b` afecta a todas las variantes de una entrada— y editar filas
+sueltas los deja volver en la próxima regeneración. `test_rubros.py` fija cada
+cadena que rompió, y tiene además un test general que recorre el nomenclador
+entero buscando reglas que matcheen a mitad de palabra: así apareció que
+"cinemato**gráfica**s" caía en `fotocopias`.
 
 El nivel 2 es donde se modela cuando hay volumen; el nivel 1 es el respaldo para
 los rubros chicos, que heredan el comportamiento de su grupo en vez de quedarse
