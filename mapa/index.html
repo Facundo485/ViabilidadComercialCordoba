@@ -193,13 +193,25 @@ h1 {
   pointer-events: none; transition: opacity .3s;
 }
 
+/* El artifact se ve muchas veces en un panel lateral angosto, así que el mapa
+   sigue a pantalla completa y lo que se achica son los paneles. Apilar recién
+   tiene sentido cuando ya no entra ni un rail flaco al lado del mapa. */
 @media (max-width: 900px) {
-  body { overflow: auto; height: auto; }
-  #map { position: relative; height: 62dvh; }
-  .panel { position: relative; inset: auto; width: auto; margin: 12px; box-shadow: none; }
-  #rail { max-height: none; }
-  #ficha { width: auto; }
+  #rail { width: 232px; }
+  #rail > * { padding: 11px 13px; }
+  h1 { font-size: 15px; }
+  .sub { font-size: 11.5px; }
+  #ficha { width: 206px; padding: 12px 13px; }
+  .gran-num { font-size: 28px; }
+  #pie { font-size: 10.5px; padding: 9px 12px; max-width: none; }
   #hint { display: none; }
+}
+@media (max-width: 620px) {
+  body { overflow: auto; height: auto; }
+  #map { position: relative; height: 58dvh; }
+  .panel { position: relative; inset: auto; width: auto; margin: 10px; box-shadow: none; }
+  #rail { max-height: none; }
+  #ficha[hidden] { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
@@ -314,9 +326,34 @@ h1 {
       filter: ["==", ["get", "m"], ""],
       paint: { "line-color": css("--ink"), "line-width": 2 }
     });
-    map.fitBounds([[-64.32, -31.52], [-64.07, -31.29]], { padding: 24, duration: 0 });
+    encuadrar();
     pintar();
   });
+
+  function encuadrar() {
+    map.fitBounds([[-64.32, -31.52], [-64.07, -31.29]], { padding: 24, duration: 0 });
+  }
+
+  // MapLibre dimensiona su canvas una sola vez, al crearse. El artifact vive en
+  // un panel que el lector agranda y achica a voluntad, así que sin esto el mapa
+  // queda del tamaño que tenía el contenedor en el primer frame — que fue
+  // exactamente el bug: una miniatura en la esquina.
+  var tocado = false;
+  map.on("dragstart", function () { tocado = true; });
+  map.on("zoomstart", function (e) { if (e.originalEvent) tocado = true; });
+
+  if (window.ResizeObserver) {
+    var pendiente;
+    new ResizeObserver(function () {
+      clearTimeout(pendiente);
+      pendiente = setTimeout(function () {
+        map.resize();
+        // Reencuadrar solo mientras el lector no haya movido el mapa: después
+        // de eso, saltarle la vista al redimensionar el panel es una molestia.
+        if (!tocado) encuadrar();
+      }, 120);
+    }).observe(document.getElementById("map"));
+  }
 
   // ---- selector ----
   var cont = document.getElementById("rubros");
