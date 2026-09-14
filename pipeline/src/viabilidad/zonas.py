@@ -133,6 +133,71 @@ def transiciones(p: pl.DataFrame, cortes: tuple[int, ...]) -> pl.DataFrame:
     )
 
 
+def desatendidas() -> pl.DataFrame:
+    """¿Las zonas con poca oferta por habitante se llenan después? Da que no.
+
+    Es la tesis intuitiva de "zona desatendida = oportunidad", y tiene la virtud
+    de que se puede medir **hoy**, sin predecir nada: bastaría con cruzar
+    población contra stock comercial. Por eso se probó antes de mandar a buscar
+    datos nuevos.
+
+    Medido sobre 241 barrios, el resultado es monótono y va **al revés**: los
+    más desatendidos en 2019 son los que menos comercio ganaron hasta 2026. El
+    comercio se concentra donde ya está en vez de repartirse a llenar huecos,
+    que es lo que predice la economía de aglomeración del retail.
+
+    Ojo con la limitación: la población es de 2025 aplicada a un cociente de
+    2019, y es de barrio. Debilita el resultado pero no lo da vuelta — el patrón
+    es monótono en los cuatro cuartiles.
+    """
+    from . import poblacion
+
+    h = supervivencia._historial()
+    d = supervivencia.duraciones(supervivencia.consolidar(h))
+    tramites = pl.read_parquet(config.DIR_CRUDO / "tramites.parquet").select("id_tramite", "barrio")
+    d = (
+        d.join(tramites, left_on="ultimo_tramite", right_on="id_tramite", how="left")
+        .drop_nulls(["barrio"])
+        .with_columns(
+            pl.col("inicio").dt.year().alias("alta"),
+            pl.col("fin_cobertura").dt.year().alias("baja"),
+            poblacion._normalizar_barrio("barrio").alias("bn"),
+        )
+    )
+
+    def stock(anio: int) -> pl.DataFrame:
+        return (
+            d.filter((pl.col("alta") <= anio) & (pl.col("baja") > anio))
+            .group_by("bn")
+            .len()
+            .rename({"len": f"s{anio}"})
+        )
+
+    inicio, fin = 2019, 2026
+    total = {
+        a: d.filter((pl.col("alta") <= a) & (pl.col("baja") > a)).height for a in (inicio, fin)
+    }
+    barrios = pl.read_parquet(config.DIR_CRUDO / poblacion.ARCHIVO).rename({"barrio_norm": "bn"})
+    w = (
+        stock(inicio)
+        .join(stock(fin), on="bn")
+        .join(barrios, on="bn", how="inner")
+        .filter(pl.col(f"s{inicio}") >= 15)
+        .with_columns(
+            (pl.col("poblacion") / pl.col(f"s{inicio}")).alias("hab_por_comercio"),
+            (
+                (pl.col(f"s{fin}") / total[fin]).log()
+                - (pl.col(f"s{inicio}") / total[inicio]).log()
+            ).alias("crecimiento"),
+        )
+    )
+    return w.with_columns(
+        pl.col("hab_por_comercio")
+        .qcut(4, labels=["1 mas servido", "2", "3", "4 mas desatendido"])
+        .alias("cuartil")
+    )
+
+
 def _corr(df: pl.DataFrame, x: str, y: str) -> float:
     return float(np.corrcoef(df[x].to_numpy(), df[y].to_numpy())[0, 1])
 
@@ -172,6 +237,23 @@ def ejecutar() -> pl.DataFrame:
         if len(g) < 25:
             continue
         print(f"  {etiqueta:<10} n={len(g):>4}  corr = {_corr(g, 'd2018_2022', 'd2022_2026'):+.3f}")
+
+    print("\n¿Las zonas desatendidas se llenan después? (la tesis intuitiva)")
+    des = desatendidas()
+    with pl.Config(tbl_hide_dataframe_shape=True):
+        print(
+            des.group_by("cuartil")
+            .agg(
+                pl.len().alias("barrios"),
+                pl.col("hab_por_comercio").median().round(0).alias("hab_x_comercio"),
+                pl.col("crecimiento").mean().round(3).alias("crecimiento_medio"),
+            )
+            .sort("cuartil")
+        )
+    print(
+        "  Va al revés: los más desatendidos son los que menos comercio ganaron.\n"
+        "  El comercio se concentra donde ya está — aglomeración, no reparto."
+    )
 
     print(
         f"\nVeredicto: el histórico va de 2014 a 2026 y solo desde {PRIMER_ANIO_LIMPIO} la\n"

@@ -449,10 +449,45 @@ absoluto, y predecir el **cambio** y no el nivel, porque el estado futuro de una
 zona está pegadísimo al actual y un modelo de nivel da métricas hermosas sin
 predecir nada.
 
-**Qué lo destrabaría:** más años —llegan a uno por año—, o una señal externa que
-vea el crecimiento urbano sin depender del registro de habilitaciones. El
-roadmap ya le había asignado ese papel a la capa satelital, y esta es la primera
-evidencia concreta de que hace falta.
+### Dos hipótesis más, probadas y descartadas
+
+**"Las zonas desatendidas se llenan."** Es la tesis intuitiva y tiene la virtud
+de medirse hoy, sin predecir nada: cruzar población contra stock comercial. Da
+al revés, y monótono sobre 241 barrios:
+
+```
+habitantes por comercio (2019)      crecimiento del comercio 2019-2026
+   19   (más servido)                   -0,045
+   38                                   -0,092
+   64                                   -0,105
+  123   (más desatendido)               -0,166
+```
+
+El comercio **se concentra donde ya está** en vez de repartirse a llenar huecos.
+Es aglomeración, consistente con la economía del retail, y mata la tesis.
+
+**"El historial de OSM da la serie larga que falta."** `ohsome` responde y es
+gratis, pero lo que crece ahí es el mapeo, no la ciudad: los edificios saltan de
+4.735 a 14.437 en un solo año (una importación masiva) y las calles se
+"triplican" desde 2012. Córdoba no triplicó sus calles. **OSM queda descartado
+como señal de crecimiento** — es el mismo artefacto de ventana, con otra cara.
+
+### Qué lo destrabaría
+
+Más años —llegan a uno por año— o una señal externa que vea el crecimiento
+urbano sin depender de ningún registro que se vaya llenando. **Eso es lo que
+hace distinta a la capa satelital: un satélite observa cada píxel en cada pasada,
+así que una imagen de 2015 está tan completa como una de 2025.** No hay
+acumulación, y por eso ahí sí hay transiciones limpias.
+
+Y hay una hipótesis con mecanismo físico detrás, que es lo que les faltaba a las
+tres que fallaron: **la construcción residencial precede a la demanda
+comercial**. Una torre nueva mete cientos de vecinos antes de que abra el primer
+local. Eso es un indicador líder de verdad, no una regularidad estadística.
+
+El roadmap ya le había asignado ese papel a la capa satelital ("detección de
+crecimiento urbano"). Esta es la primera evidencia concreta de que hace falta y
+de para qué exactamente.
 
 **Lo que sí es defendible hoy** es describir qué zonas están creciendo *ahora*
 —es medición, no predicción— y el score de nivel por manzana x rubro.
