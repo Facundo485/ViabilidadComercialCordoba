@@ -28,6 +28,32 @@ log = logging.getLogger(__name__)
 ARCHIVO = "datos.js"
 
 
+# Las coordenadas se guardan como enteros delta, no como texto decimal.
+#
+# Escritas en claro, "[-64.19142,-31.36512]" son 20 caracteres por vértice, y
+# son 130.264 vértices: el archivo daba 5,1 MB y en red celular tardaba casi
+# veinte segundos en cargar. Guardadas como diferencias contra el vértice
+# anterior, cada una entra en dos o tres dígitos, porque una manzana mide
+# decenas de metros.
+#
+# El cliente las reconstruye al cargar. Es la única complejidad que se le suma a
+# la página, y compra que el mapa abra en un teléfono.
+ESCALA = 100_000  # 1e-5 grados, ~1 m
+
+
+def _codificar(anillo: list, origen: tuple[float, float]) -> list[int]:
+    """Anillo a enteros: primer vértice absoluto contra el origen, resto deltas."""
+    salida: list[int] = []
+    px = py = 0
+    for lon, lat in anillo:
+        x = round((lon - origen[0]) * ESCALA)
+        y = round((lat - origen[1]) * ESCALA)
+        salida.append(x - px)
+        salida.append(y - py)
+        px, py = x, y
+    return salida
+
+
 def construir() -> dict:
     geo = json.loads((config.DIR_PROCESADO / geometria.ARCHIVO).read_text())
     s = pl.read_parquet(config.DIR_PROCESADO / score.ARCHIVO)
@@ -37,40 +63,40 @@ def construir() -> dict:
     ancho = s.pivot("rubro", index="manzana", values="score")
     ancho = ancho.join(manzanas.select("manzana", "barrio", "hab_total"), on="manzana", how="left")
 
-    # Se dibujan **todas** las manzanas de la ciudad, no solo las que tienen
-    # score. Son 19.600 contra 6.892: si se muestran nada más las que tienen
-    # historia comercial, Córdoba parece un archipiélago y los huecos se leen
-    # como error del mapa. Y la ausencia también informa — una manzana sin
-    # ninguna habilitación en doce años está diciendo algo.
+    origen = (config.BBOX_CORDOBA["lon_min"], config.BBOX_CORDOBA["lat_min"])
+
+    # Se emiten **todas** las manzanas de la ciudad, no solo las que tienen
+    # score. Son 19.600 contra 6.892: mostrando nada más las que tienen historia
+    # comercial, Córdoba parece un archipiélago y los huecos se leen como error
+    # del mapa. Y la ausencia también informa — una manzana sin ninguna
+    # habilitación en doce años está diciendo algo.
     con_score = {f["manzana"]: f for f in ancho.iter_rows(named=True)}
-    rasgos = []
+    filas = []
     for manzana, anillo in geo.items():
         if not anillo or len(anillo) < 4:
             continue
-        propiedades = {"m": manzana}
         fila = con_score.get(manzana)
-        if fila is not None:
-            propiedades["b"] = fila["barrio"]
-            propiedades["n"] = int(fila["hab_total"] or 0)
-            # Los scores van como array indexado por rubro, no como claves con
-            # nombre: repetir "bar_restaurante" 6.892 veces pesaba un megabyte
-            # entero. Y como enteros por mil, que es más precisión de la que el
-            # modelo tiene para dar.
-            propiedades["s"] = [round((fila[r] or 0) * 1000) for r in rubros]
-        rasgos.append(
-            {
-                "type": "Feature",
-                "geometry": {"type": "Polygon", "coordinates": [anillo]},
-                "properties": propiedades,
-            }
-        )
+        if fila is None:
+            filas.append([manzana, None, 0, None, _codificar(anillo, origen)])
+        else:
+            filas.append(
+                [
+                    manzana,
+                    fila["barrio"],
+                    int(fila["hab_total"] or 0),
+                    # Enteros por mil: más precisión de la que el modelo tiene.
+                    [round((fila[r] or 0) * 1000) for r in rubros],
+                    _codificar(anillo, origen),
+                ]
+            )
 
-    if not rasgos:
-        raise ValueError("Ninguna manzana quedó con geometría y score a la vez.")
-
+    if not filas:
+        raise ValueError("Ninguna manzana quedó con geometría.")
     return {
+        "origen": list(origen),
+        "escala": ESCALA,
         "rubros": rubros,
-        "manzanas": {"type": "FeatureCollection", "features": rasgos},
+        "manzanas": filas,
     }
 
 
@@ -80,9 +106,9 @@ def ejecutar() -> dict:
     salida.write_text("window.DATOS=" + json.dumps(datos, separators=(",", ":")) + ";")
 
     print(f"\n{'=' * 72}\n  Datos del mapa\n{'=' * 72}")
-    con = sum(1 for f in datos["manzanas"]["features"] if "s" in f["properties"])
+    con = sum(1 for f in datos["manzanas"] if f[3] is not None)
     print(
-        f"\n{len(datos['manzanas']['features']):,} manzanas dibujadas | "
+        f"\n{len(datos['manzanas']):,} manzanas dibujadas | "
         f"{con:,} con score | {len(datos['rubros'])} rubros"
     )
     print(f"{salida.stat().st_size / 1e6:.2f} MB en {salida}")

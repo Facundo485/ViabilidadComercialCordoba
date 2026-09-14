@@ -230,6 +230,17 @@ h1 {
   pointer-events: none; transition: opacity .3s;
 }
 
+#aviso {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  max-width: min(320px, calc(100vw - 48px));
+  text-align: center; text-wrap: balance;
+  font-size: 13px; line-height: 1.5; color: var(--ink-soft);
+  background: var(--surface); border: 1px solid var(--line);
+  padding: 14px 18px; border-radius: 10px; box-shadow: var(--panel-shadow);
+  z-index: 5;
+}
+#aviso[hidden] { display: none; }
+
 /* El artifact se ve muchas veces en un panel lateral angosto, así que el mapa
    sigue a pantalla completa y lo que se achica son los paneles. Apilar recién
    tiene sentido cuando ya no entra ni un rail flaco al lado del mapa. */
@@ -302,6 +313,11 @@ h1 {
 
 <div id="hint">Pasá el mouse por una manzana</div>
 
+<!-- Estado de carga y de error. A diferencia de #hint, este se ve en cualquier
+     tamaño: en un teléfono con red lenta son varios segundos de pantalla vacía,
+     y sin esto no hay forma de distinguir "cargando" de "se rompió". -->
+<div id="aviso">Cargando las 19.600 manzanas de Córdoba…</div>
+
 <section class="panel" id="rail">
   <header>
     <h1>Viabilidad comercial · Córdoba</h1>
@@ -343,16 +359,37 @@ h1 {
 <script>
 (function () {
   "use strict";
+  var aviso = document.getElementById("aviso");
   var D = window.DATOS;
   if (!D || !D.manzanas) {
-    // Sin datos la página no tiene nada que decir, y quedarse en blanco es
-    // peor que decirlo: ya pasó una vez, por publicar datos.js sin enlazarlo.
-    document.getElementById("hint").textContent =
-      "No se cargaron los datos del mapa (datos.js).";
+    // Quedarse en blanco es peor que avisar. Ya pasó dos veces: una por no
+    // enlazar datos.js, y otra por poner el aviso en un elemento que en
+    // teléfono estaba oculto, así que no se enteraba nadie.
+    aviso.textContent = "No se cargaron los datos del mapa. Probá recargar.";
+    aviso.hidden = false;
     return;
   }
   var rubros = D.rubros;
-  var feats = D.manzanas.features;
+
+  // Las coordenadas llegan como enteros delta contra el vértice anterior.
+  // Reconstruirlas acá es lo que permite que el archivo pese 1,9 MB en vez de
+  // 5,1 y que el mapa abra con datos móviles.
+  var feats = D.manzanas.map(function (m) {
+    var d = m[4], anillo = new Array(d.length / 2), x = 0, y = 0;
+    for (var i = 0, j = 0; i < d.length; i += 2, j++) {
+      x += d[i]; y += d[i + 1];
+      anillo[j] = [D.origen[0] + x / D.escala, D.origen[1] + y / D.escala];
+    }
+    var props = { m: m[0], b: m[1], n: m[2] };
+    if (m[3]) props.s = m[3];
+    return {
+      type: "Feature",
+      geometry: { type: "Polygon", coordinates: [anillo] },
+      properties: props
+    };
+  });
+  var coleccion = { type: "FeatureCollection", features: feats };
+  aviso.hidden = true;
 
   var NOMBRES = {
     almacen: "Almacén", bar_restaurante: "Bar y restaurante", bebidas: "Bebidas",
@@ -404,7 +441,7 @@ h1 {
   function css(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
 
   map.on("load", function () {
-    map.addSource("mz", { type: "geojson", data: D.manzanas });
+    map.addSource("mz", { type: "geojson", data: coleccion });
     map.addLayer({
       id: "manzanas", type: "fill", source: "mz",
       paint: { "fill-color": colorExpr(), "fill-opacity": 0.92 }
