@@ -1,0 +1,397 @@
+<title>Viabilidad Comercial Córdoba</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.js"></script>
+
+<style>
+:root {
+  --ground: #eeece6;
+  --surface: #f7f6f2;
+  --surface-2: #e5e2d9;
+  --line: #d2cec2;
+  --ink: #23262b;
+  --ink-soft: #5c6068;
+  --ink-faint: #8b8f98;
+
+  /* Escala divergente alrededor del promedio del rubro. Frío = por debajo,
+     cálido = por encima. El punto neutro no es un valor lindo: es el promedio. */
+  --s1: #2f6f8f;
+  --s2: #7d9aa6;
+  --s3: #b9b2a3;
+  --s4: #d99b3c;
+  --s5: #a8611a;
+
+  --focus: #2f6f8f;
+  --panel-shadow: 0 1px 2px rgba(35,38,43,.08), 0 8px 28px rgba(35,38,43,.10);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #0f1319;
+    --surface: #171c25;
+    --surface-2: #202834;
+    --line: #2b3442;
+    --ink: #e7eaf0;
+    --ink-soft: #9aa4b4;
+    --ink-faint: #6c7686;
+    --s1: #3d7f9e;
+    --s2: #5d7f8f;
+    --s3: #565c68;
+    --s4: #d9a441;
+    --s5: #f2dfa8;
+    --focus: #d9a441;
+    --panel-shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 32px rgba(0,0,0,.45);
+  }
+}
+:root[data-theme="dark"] {
+  --ground: #0f1319;
+  --surface: #171c25;
+  --surface-2: #202834;
+  --line: #2b3442;
+  --ink: #e7eaf0;
+  --ink-soft: #9aa4b4;
+  --ink-faint: #6c7686;
+  --s1: #3d7f9e;
+  --s2: #5d7f8f;
+  --s3: #565c68;
+  --s4: #d9a441;
+  --s5: #f2dfa8;
+  --focus: #d9a441;
+  --panel-shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 32px rgba(0,0,0,.45);
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: Archivo, system-ui, -apple-system, "Segoe UI", sans-serif;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+#map { position: absolute; inset: 0; background: var(--ground); }
+#map canvas { position: absolute; top: 0; left: 0; outline: none; }
+
+.panel {
+  position: absolute;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: var(--panel-shadow);
+}
+
+/* ---- rail izquierdo ---- */
+#rail {
+  top: 16px; left: 16px; width: 286px;
+  max-height: calc(100dvh - 32px);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+#rail > * { padding: 14px 16px; }
+#rail > * + * { border-top: 1px solid var(--line); }
+
+h1 {
+  margin: 0;
+  font-size: 17px; font-weight: 700; letter-spacing: -.01em;
+  text-wrap: balance;
+}
+.sub {
+  margin: 5px 0 0;
+  font-size: 12px; line-height: 1.5; color: var(--ink-soft);
+}
+
+.eyebrow {
+  font-size: 10px; font-weight: 600;
+  letter-spacing: .1em; text-transform: uppercase;
+  color: var(--ink-faint);
+  margin: 0 0 9px;
+}
+
+/* ---- selector de rubro ---- */
+#rubros { overflow-y: auto; padding-top: 12px; padding-bottom: 12px; flex: 1; min-height: 120px; }
+.rubro {
+  display: grid; grid-template-columns: 1fr auto;
+  align-items: baseline; gap: 10px;
+  width: 100%; padding: 6px 8px;
+  background: none; border: 0; border-radius: 6px;
+  color: var(--ink-soft);
+  font: inherit; font-size: 13px; text-align: left;
+  cursor: pointer;
+}
+.rubro:hover { background: var(--surface-2); color: var(--ink); }
+.rubro[aria-pressed="true"] { background: var(--surface-2); color: var(--ink); font-weight: 600; }
+.rubro:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.rubro .pct {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11.5px; font-variant-numeric: tabular-nums;
+  color: var(--ink-faint);
+}
+.rubro[aria-pressed="true"] .pct { color: var(--ink-soft); }
+
+/* ---- leyenda ---- */
+#escala { display: flex; height: 9px; border-radius: 3px; overflow: hidden; }
+#escala span { flex: 1; }
+.escala-ejes {
+  display: flex; justify-content: space-between;
+  margin-top: 6px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 10.5px; color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+.nota-escala {
+  margin: 9px 0 0; font-size: 11.5px; line-height: 1.5; color: var(--ink-soft);
+}
+.nota-escala b { color: var(--ink); font-weight: 600; }
+
+/* ---- ficha de manzana ---- */
+#ficha {
+  top: 16px; right: 16px; width: 252px; padding: 14px 16px;
+}
+#ficha[hidden] { display: none; }
+.mz {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 15px; font-weight: 600; letter-spacing: .02em;
+}
+.barrio { margin: 2px 0 12px; font-size: 12px; color: var(--ink-soft); }
+.gran-num {
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 34px; font-weight: 600; line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.gran-num small { font-size: 16px; font-weight: 500; color: var(--ink-soft); }
+.delta { margin: 7px 0 0; font-size: 12px; line-height: 1.5; color: var(--ink-soft); }
+.delta b { color: var(--ink); font-weight: 600; }
+.datos { margin: 12px 0 0; padding-top: 11px; border-top: 1px solid var(--line); }
+.dato { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; padding: 3px 0; }
+.dato dt { color: var(--ink-faint); }
+.dato dd {
+  margin: 0; font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-variant-numeric: tabular-nums; color: var(--ink-soft);
+}
+
+/* ---- pie: las limitaciones, siempre visibles ---- */
+#pie {
+  left: 16px; bottom: 16px; right: 16px;
+  max-width: 660px;
+  padding: 11px 15px;
+  font-size: 11.5px; line-height: 1.55; color: var(--ink-soft);
+}
+#pie b { color: var(--ink); font-weight: 600; }
+#pie p { margin: 0; }
+#pie p + p { margin-top: 5px; }
+
+#hint {
+  position: absolute; left: 50%; top: 18px; transform: translateX(-50%);
+  font-size: 11.5px; color: var(--ink-faint);
+  background: var(--surface); border: 1px solid var(--line);
+  padding: 5px 12px; border-radius: 999px;
+  pointer-events: none; transition: opacity .3s;
+}
+
+@media (max-width: 900px) {
+  body { overflow: auto; height: auto; }
+  #map { position: relative; height: 62dvh; }
+  .panel { position: relative; inset: auto; width: auto; margin: 12px; box-shadow: none; }
+  #rail { max-height: none; }
+  #ficha { width: auto; }
+  #hint { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div id="map"></div>
+
+<div id="hint">Pasá el mouse por una manzana</div>
+
+<section class="panel" id="rail">
+  <header>
+    <h1>Viabilidad comercial · Córdoba</h1>
+    <p class="sub">Probabilidad de que un comercio abierto hoy en esta manzana pase su primer vencimiento de habilitación, a los 5,5 años.</p>
+  </header>
+
+  <div id="rubros">
+    <p class="eyebrow">Rubro</p>
+  </div>
+
+  <div>
+    <p class="eyebrow">Contra el promedio del rubro</p>
+    <div id="escala" role="img" aria-label="Escala de color divergente alrededor del promedio de la ciudad"></div>
+    <div class="escala-ejes"><span id="ejeMin"></span><span id="ejeMed"></span><span id="ejeMax"></span></div>
+    <p class="nota-escala">El punto neutro es el promedio de la ciudad para ese rubro: <b id="promRubro"></b>. Una farmacia y un bar no tienen la misma expectativa de vida, así que cada rubro se compara contra el suyo.</p>
+  </div>
+</section>
+
+<aside class="panel" id="ficha" hidden>
+  <div class="mz" id="fMz"></div>
+  <div class="barrio" id="fBarrio"></div>
+  <div class="gran-num"><span id="fScore"></span><small>%</small></div>
+  <p class="delta" id="fDelta"></p>
+  <dl class="datos">
+    <div class="dato"><dt>Rubro</dt><dd id="fRubro"></dd></div>
+    <div class="dato"><dt>Habilitaciones 2014-2026</dt><dd id="fHab"></dd></div>
+    <div class="dato"><dt>Percentil en la ciudad</dt><dd id="fPct"></dd></div>
+  </dl>
+</aside>
+
+<footer class="panel" id="pie">
+  <p><b>Esto no predice si un local va a cerrar.</b> El objetivo es un proxy —renovó o no el permiso— calibrado contra Google Places: 61&nbsp;% de exactitud, lo que pone un techo de AUC 0,608 que ninguna variable rompe. Por eso el número va agregado a manzana y rubro, donde el ruido promedia, y nunca como veredicto sobre una dirección.</p>
+  <p><b>Es predictivo, no causal</b>, y describe el presente: seis hipótesis de trayectoria dieron nulo, así que no dice qué zona va a mejorar. Manzanas sin aperturas recientes se describen con datos más viejos.</p>
+</footer>
+
+<script>
+(function () {
+  "use strict";
+  var D = window.DATOS;
+  var rubros = D.rubros;
+  var feats = D.manzanas.features;
+
+  var NOMBRES = {
+    almacen: "Almacén", bar_restaurante: "Bar y restaurante", bebidas: "Bebidas",
+    bijouterie: "Bijouterie y joyería", calzado: "Calzado", carniceria: "Carnicería",
+    comercio_otros: "Comercio general", fabricacion: "Fabricación",
+    juegos_azar: "Juegos de azar", oficina: "Oficina y servicios",
+    otro: "Otros rubros", ropa: "Indumentaria"
+  };
+  var nombre = function (r) { return NOMBRES[r] || r; };
+
+  // Estadística por rubro: promedio y cortes de la escala. Se calcula acá y no
+  // en el pipeline para que la escala siempre use contraste real del rubro
+  // elegido en vez de un rango fijo que aplaste a los rubros parejos.
+  var stats = rubros.map(function (_, i) {
+    var v = feats.map(function (f) { return f.properties.s[i]; }).sort(function (a, b) { return a - b; });
+    var q = function (p) { return v[Math.min(v.length - 1, Math.floor(p * v.length))]; };
+    var suma = 0; for (var k = 0; k < v.length; k++) suma += v[k];
+    return { orden: v, media: suma / v.length, p05: q(0.05), p50: q(0.5), p95: q(0.95) };
+  });
+
+  var idx = 0;
+  var fijada = null;
+
+  var pct = function (mil) { return (mil / 10).toFixed(1); };
+
+  var map = new maplibregl.Map({
+    container: "map",
+    style: { version: 8, sources: {}, layers: [] },
+    center: [-64.19, -31.41], zoom: 11.4, minZoom: 9.5, maxZoom: 16,
+    attributionControl: false, dragRotate: false
+  });
+  map.touchZoomRotate.disableRotation();
+
+  function colorExpr() {
+    var s = stats[idx];
+    var valor = ["at", idx, ["get", "s"]];
+    return ["interpolate", ["linear"], valor,
+      s.p05, css("--s1"), (s.p05 + s.p50) / 2, css("--s2"),
+      s.p50, css("--s3"),
+      (s.p50 + s.p95) / 2, css("--s4"), s.p95, css("--s5")];
+  }
+  function css(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+
+  map.on("load", function () {
+    map.addSource("mz", { type: "geojson", data: D.manzanas });
+    map.addLayer({
+      id: "manzanas", type: "fill", source: "mz",
+      paint: { "fill-color": colorExpr(), "fill-opacity": 0.92 }
+    });
+    map.addLayer({
+      id: "bordes", type: "line", source: "mz",
+      paint: { "line-color": css("--ground"), "line-width": 0.5, "line-opacity": 0.55 }
+    });
+    map.addLayer({
+      id: "resalte", type: "line", source: "mz",
+      filter: ["==", ["get", "m"], ""],
+      paint: { "line-color": css("--ink"), "line-width": 2 }
+    });
+    map.fitBounds([[-64.32, -31.52], [-64.07, -31.29]], { padding: 24, duration: 0 });
+    pintar();
+  });
+
+  // ---- selector ----
+  var cont = document.getElementById("rubros");
+  rubros.forEach(function (r, i) {
+    var b = document.createElement("button");
+    b.className = "rubro"; b.type = "button";
+    b.setAttribute("aria-pressed", i === idx ? "true" : "false");
+    b.innerHTML = '<span>' + nombre(r) + '</span><span class="pct">' + pct(stats[i].media) + '%</span>';
+    b.addEventListener("click", function () {
+      idx = i;
+      cont.querySelectorAll(".rubro").forEach(function (o, j) {
+        o.setAttribute("aria-pressed", j === i ? "true" : "false");
+      });
+      if (map.getLayer("manzanas")) map.setPaintProperty("manzanas", "fill-color", colorExpr());
+      pintar();
+      if (fijada) mostrar(fijada);
+    });
+    cont.appendChild(b);
+  });
+
+  // ---- leyenda ----
+  var escala = document.getElementById("escala");
+  ["--s1", "--s2", "--s3", "--s4", "--s5"].forEach(function (v) {
+    var sp = document.createElement("span");
+    sp.style.background = "var(" + v + ")";
+    escala.appendChild(sp);
+  });
+
+  function pintar() {
+    var s = stats[idx];
+    document.getElementById("ejeMin").textContent = pct(s.p05) + "%";
+    document.getElementById("ejeMed").textContent = pct(s.p50) + "%";
+    document.getElementById("ejeMax").textContent = pct(s.p95) + "%";
+    document.getElementById("promRubro").textContent = pct(s.media) + "%";
+  }
+
+  // ---- ficha ----
+  var ficha = document.getElementById("ficha");
+  var hint = document.getElementById("hint");
+
+  function percentil(valor) {
+    var v = stats[idx].orden, lo = 0, hi = v.length;
+    while (lo < hi) { var mid = (lo + hi) >> 1; if (v[mid] < valor) lo = mid + 1; else hi = mid; }
+    return Math.round((lo / v.length) * 100);
+  }
+
+  function mostrar(p) {
+    var val = p.s[idx], media = stats[idx].media;
+    var dif = (val - media) / 10;
+    document.getElementById("fMz").textContent = p.m;
+    document.getElementById("fBarrio").textContent = p.b || "Sin barrio asignado";
+    document.getElementById("fScore").textContent = pct(val);
+    document.getElementById("fRubro").textContent = nombre(rubros[idx]);
+    document.getElementById("fHab").textContent = p.n;
+    document.getElementById("fPct").textContent = percentil(val) + "º";
+    var d = document.getElementById("fDelta");
+    if (Math.abs(dif) < 0.35) {
+      d.innerHTML = "En el promedio del rubro para la ciudad.";
+    } else {
+      d.innerHTML = "<b>" + (dif > 0 ? "+" : "") + dif.toFixed(1) +
+        " puntos</b> " + (dif > 0 ? "por encima" : "por debajo") + " del promedio del rubro.";
+    }
+    ficha.hidden = false;
+    hint.style.opacity = "0";
+  }
+
+  map.on("mousemove", "manzanas", function (e) {
+    if (fijada) return;
+    map.getCanvas().style.cursor = "pointer";
+    var p = e.features[0].properties;
+    p.s = typeof p.s === "string" ? JSON.parse(p.s) : p.s;
+    map.setFilter("resalte", ["==", ["get", "m"], p.m]);
+    mostrar(p);
+  });
+  map.on("mouseleave", "manzanas", function () {
+    map.getCanvas().style.cursor = "";
+    if (fijada) return;
+    map.setFilter("resalte", ["==", ["get", "m"], ""]);
+    ficha.hidden = true;
+  });
+  map.on("click", "manzanas", function (e) {
+    var p = e.features[0].properties;
+    p.s = typeof p.s === "string" ? JSON.parse(p.s) : p.s;
+    fijada = (fijada && fijada.m === p.m) ? null : p;
+    map.setFilter("resalte", ["==", ["get", "m"], fijada ? p.m : ""]);
+    if (fijada) mostrar(p); else ficha.hidden = true;
+  });
+})();
+</script>

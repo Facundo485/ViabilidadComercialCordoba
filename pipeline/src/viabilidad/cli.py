@@ -14,8 +14,10 @@ from . import (
     config,
     diagnostico,
     features,
+    geometria,
     ingest,
     manzanas,
+    mapa,
     mapeo,
     modelo,
     osm,
@@ -23,6 +25,7 @@ from . import (
     poblacion,
     resumen,
     satelital,
+    score,
     supervivencia,
     validacion,
     zonas,
@@ -107,6 +110,21 @@ def cmd_muestra(_) -> None:
     validacion.ejecutar()
 
 
+def cmd_mapa(_) -> None:
+    """Arma los datos que consume el mapa (geometría + score)."""
+    mapa.ejecutar()
+
+
+def cmd_score(_) -> None:
+    """El score de viabilidad por manzana y rubro."""
+    score.ejecutar()
+
+
+def cmd_geometria(_) -> None:
+    """Polígonos de manzana simplificados, para el mapa."""
+    geometria.ejecutar()
+
+
 def cmd_altura(_) -> None:
     """Altura edificada por zona y año, desde Open Buildings (Earth Engine)."""
     altura.ejecutar()
@@ -168,6 +186,9 @@ COMANDOS = {
     "zonas": cmd_zonas,
     "satelital": cmd_satelital,
     "altura": cmd_altura,
+    "geometria": cmd_geometria,
+    "score": cmd_score,
+    "mapa": cmd_mapa,
     "places": cmd_places,
     "todo": cmd_todo,
 }
