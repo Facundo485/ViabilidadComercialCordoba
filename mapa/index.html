@@ -25,6 +25,9 @@
   --s3: #b9b2a3;
   --s4: #d99b3c;
   --s5: #a8611a;
+  /* Manzanas sin ninguna habilitación en doce años. No es "malo": es que ahí
+     no hay comercio, y el mapa lo dice en vez de dejar un agujero. */
+  --sin-datos: #dcd8cd;
 
   --focus: #2f6f8f;
   --panel-shadow: 0 1px 2px rgba(35,38,43,.08), 0 8px 28px rgba(35,38,43,.10);
@@ -43,6 +46,7 @@
     --s3: #565c68;
     --s4: #d9a441;
     --s5: #f2dfa8;
+    --sin-datos: #262d38;
     --focus: #d9a441;
     --panel-shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 32px rgba(0,0,0,.45);
   }
@@ -60,6 +64,7 @@
   --s3: #565c68;
   --s4: #d9a441;
   --s5: #f2dfa8;
+  --sin-datos: #262d38;
   --focus: #d9a441;
   --panel-shadow: 0 1px 2px rgba(0,0,0,.4), 0 10px 32px rgba(0,0,0,.45);
 }
@@ -147,6 +152,18 @@ h1 {
   margin: 9px 0 0; font-size: 11.5px; line-height: 1.5; color: var(--ink-soft);
 }
 .nota-escala b { color: var(--ink); font-weight: 600; }
+.sin-datos-nota {
+  display: flex; align-items: flex-start; gap: 8px;
+  margin: 10px 0 0; padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-size: 11.5px; line-height: 1.5; color: var(--ink-soft);
+}
+.sin-datos-nota b { color: var(--ink); font-weight: 600; }
+.muestra {
+  flex: none; width: 13px; height: 13px; margin-top: 2px;
+  border-radius: 3px; border: 1px solid var(--line);
+  background: var(--sin-datos);
+}
 
 /* ---- ficha de manzana ---- */
 #ficha {
@@ -235,6 +252,7 @@ h1 {
     <div id="escala" role="img" aria-label="Escala de color divergente alrededor del promedio de la ciudad"></div>
     <div class="escala-ejes"><span id="ejeMin"></span><span id="ejeMed"></span><span id="ejeMax"></span></div>
     <p class="nota-escala">El punto neutro es el promedio de la ciudad para ese rubro: <b id="promRubro"></b>. Una farmacia y un bar no tienen la misma expectativa de vida, así que cada rubro se compara contra el suyo.</p>
+    <p class="sin-datos-nota"><span class="muestra"></span> <span><b id="nSinDatos"></b> manzanas sin ninguna habilitación desde 2014. No es un score bajo: no hay con qué calcularlo.</span></p>
   </div>
 </section>
 
@@ -281,8 +299,10 @@ h1 {
   // Estadística por rubro: promedio y cortes de la escala. Se calcula acá y no
   // en el pipeline para que la escala siempre use contraste real del rubro
   // elegido en vez de un rango fijo que aplaste a los rubros parejos.
+  var conScore = feats.filter(function (f) { return f.properties.s; });
+
   var stats = rubros.map(function (_, i) {
-    var v = feats.map(function (f) { return f.properties.s[i]; }).sort(function (a, b) { return a - b; });
+    var v = conScore.map(function (f) { return f.properties.s[i]; }).sort(function (a, b) { return a - b; });
     var q = function (p) { return v[Math.min(v.length - 1, Math.floor(p * v.length))]; };
     var suma = 0; for (var k = 0; k < v.length; k++) suma += v[k];
     return { orden: v, media: suma / v.length, p05: q(0.05), p50: q(0.5), p95: q(0.95) };
@@ -304,10 +324,15 @@ h1 {
   function colorExpr() {
     var s = stats[idx];
     var valor = ["at", idx, ["get", "s"]];
-    return ["interpolate", ["linear"], valor,
-      s.p05, css("--s1"), (s.p05 + s.p50) / 2, css("--s2"),
-      s.p50, css("--s3"),
-      (s.p50 + s.p95) / 2, css("--s4"), s.p95, css("--s5")];
+    // Las manzanas sin historia comercial van en neutro. Son 12.708 de 19.600,
+    // así que sin este caso el mapa queda lleno de agujeros y Córdoba parece un
+    // archipiélago.
+    return ["case", ["has", "s"],
+      ["interpolate", ["linear"], valor,
+        s.p05, css("--s1"), (s.p05 + s.p50) / 2, css("--s2"),
+        s.p50, css("--s3"),
+        (s.p50 + s.p95) / 2, css("--s4"), s.p95, css("--s5")],
+      css("--sin-datos")];
   }
   function css(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
 
@@ -389,6 +414,8 @@ h1 {
     document.getElementById("ejeMax").textContent = pct(s.p95) + "%";
     document.getElementById("promRubro").textContent = pct(s.media) + "%";
   }
+  document.getElementById("nSinDatos").textContent =
+    (feats.length - conScore.length).toLocaleString("es-AR");
 
   // ---- ficha ----
   var ficha = document.getElementById("ficha");
@@ -401,9 +428,25 @@ h1 {
   }
 
   function mostrar(p) {
+    document.getElementById("fMz").textContent = p.m;
+    ficha.hidden = false;
+    hint.style.opacity = "0";
+
+    if (!p.s) {
+      // Sin habilitaciones en doce años. No es un score bajo: es que no hay
+      // con qué calcularlo, y decirlo vale más que mostrar un número inventado.
+      document.getElementById("fBarrio").textContent = "Sin actividad comercial registrada";
+      document.getElementById("fScore").textContent = "—";
+      document.getElementById("fDelta").innerHTML =
+        "Ninguna habilitación entre 2014 y 2026. El modelo no tiene con qué estimar acá.";
+      document.getElementById("fRubro").textContent = "—";
+      document.getElementById("fHab").textContent = "0";
+      document.getElementById("fPct").textContent = "—";
+      return;
+    }
+
     var val = p.s[idx], media = stats[idx].media;
     var dif = (val - media) / 10;
-    document.getElementById("fMz").textContent = p.m;
     document.getElementById("fBarrio").textContent = p.b || "Sin barrio asignado";
     document.getElementById("fScore").textContent = pct(val);
     document.getElementById("fRubro").textContent = nombre(rubros[idx]);
@@ -416,15 +459,20 @@ h1 {
       d.innerHTML = "<b>" + (dif > 0 ? "+" : "") + dif.toFixed(1) +
         " puntos</b> " + (dif > 0 ? "por encima" : "por debajo") + " del promedio del rubro.";
     }
-    ficha.hidden = false;
-    hint.style.opacity = "0";
+  }
+
+  // MapLibre serializa las propiedades que son arrays, así que vuelven como
+  // texto y hay que devolverlas a array antes de indexarlas.
+  function propiedades(rasgo) {
+    var p = rasgo.properties;
+    if (typeof p.s === "string") p.s = JSON.parse(p.s);
+    return p;
   }
 
   map.on("mousemove", "manzanas", function (e) {
     if (fijada) return;
     map.getCanvas().style.cursor = "pointer";
-    var p = e.features[0].properties;
-    p.s = typeof p.s === "string" ? JSON.parse(p.s) : p.s;
+    var p = propiedades(e.features[0]);
     map.setFilter("resalte", ["==", ["get", "m"], p.m]);
     mostrar(p);
   });
@@ -435,8 +483,7 @@ h1 {
     ficha.hidden = true;
   });
   map.on("click", "manzanas", function (e) {
-    var p = e.features[0].properties;
-    p.s = typeof p.s === "string" ? JSON.parse(p.s) : p.s;
+    var p = propiedades(e.features[0]);
     fijada = (fijada && fijada.m === p.m) ? null : p;
     map.setFilter("resalte", ["==", ["get", "m"], fijada ? p.m : ""]);
     if (fijada) mostrar(p); else ficha.hidden = true;
