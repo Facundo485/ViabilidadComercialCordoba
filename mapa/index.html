@@ -3,6 +3,10 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.js"></script>
+<!-- Geometría de manzanas y score por rubro. Define window.DATOS. Va como
+     script y no como fetch porque la política de contenido del artifact
+     bloquea los pedidos sueltos, pero un script del mismo origen carga. -->
+<script src="datos.js"></script>
 
 <style>
 :root {
@@ -243,6 +247,13 @@ h1 {
 (function () {
   "use strict";
   var D = window.DATOS;
+  if (!D || !D.manzanas) {
+    // Sin datos la página no tiene nada que decir, y quedarse en blanco es
+    // peor que decirlo: ya pasó una vez, por publicar datos.js sin enlazarlo.
+    document.getElementById("hint").textContent =
+      "No se cargaron los datos del mapa (datos.js).";
+    return;
+  }
   var rubros = D.rubros;
   var feats = D.manzanas.features;
 
