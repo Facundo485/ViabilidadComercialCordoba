@@ -8,6 +8,7 @@ import logging
 import polars as pl
 
 from . import (
+    altura,
     arcgis,
     cohortes,
     config,
@@ -106,6 +107,11 @@ def cmd_muestra(_) -> None:
     validacion.ejecutar()
 
 
+def cmd_altura(_) -> None:
+    """Altura edificada por zona y año, desde Open Buildings (Earth Engine)."""
+    altura.ejecutar()
+
+
 def cmd_satelital(_) -> None:
     """Serie anual de superficie construida desde Sentinel-2."""
     satelital.ejecutar()
@@ -161,6 +167,7 @@ COMANDOS = {
     "modelo": cmd_modelo,
     "zonas": cmd_zonas,
     "satelital": cmd_satelital,
+    "altura": cmd_altura,
     "places": cmd_places,
     "todo": cmd_todo,
 }
