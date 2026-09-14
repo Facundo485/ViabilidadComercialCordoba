@@ -349,8 +349,27 @@ anacronismo, aceptable porque la estructura de un barrio se mueve despacio) y
 son de **barrio**, unidad gruesa para un score de manzana — el propio
 diccionario del municipio avisa que "no reflejan la realidad territorial".
 
-Queda pendiente OSM (red vial y equipamientos): `python -m viabilidad osm`, con
-la consulta partida en tiles porque Overpass devuelve 504 con la ciudad entera.
+### OSM quedó pendiente, y no lo esperaría
+
+`python -m viabilidad osm` está escrito y probado pieza por pieza, pero **no
+llegó a bajar**: Overpass es un servicio gratuito compartido y nos terminó
+limitando — primero 504 en los dos espejos, después timeout hasta en una
+consulta mínima. No hay ningún parquet de OSM en `data/crudo/`.
+
+El módulo baja **solo la red principal** (primary, secondary, trunk, tertiary),
+y eso es una decisión y no un atajo: la variable estructural que interesa es la
+accesibilidad —estar sobre una avenida no es lo mismo que estar en una calle
+interna— mientras que la densidad de calles residenciales es un proxy de
+urbanización que ya entra por la densidad poblacional del barrio. De paso,
+`residential` era el 90% del volumen y lo que hacía explotar cada tile.
+
+Para retomarlo: correrlo en un momento de menos carga, o esperar unas horas a
+que Overpass nos destrabe. Cachea por capa, así que lo que baje queda.
+
+**Pero el valor esperado ahora es bajo.** Con el techo en 0,608 y el modelo en
+0,593, ninguna feature nueva puede aportar más de 0,015 — y las socioeconómicas,
+que son del mismo tipo estructural, aportaron 0,010. No es donde está la
+palanca.
 
 ---
 

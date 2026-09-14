@@ -37,11 +37,17 @@ ESPEJOS = (
 CABECERAS = {"User-Agent": "viabilidad-cordoba/0.1 (pipeline de investigacion urbana)"}
 TIMEOUT = 420
 
-# Jerarquía vial. Se separa la red principal del resto: estar sobre una avenida
-# no es lo mismo que estar en una calle interna, y esa diferencia es la que se
-# espera que prediga.
-PRINCIPALES = ("primary", "secondary", "trunk")
-SECUNDARIAS = ("tertiary", "residential", "unclassified", "living_street")
+# Solo la red principal, y es una decisión de diseño, no un atajo.
+#
+# La variable estructural que interesa es la **accesibilidad**: estar sobre una
+# avenida no es lo mismo que estar en una calle interna. La densidad de calles
+# residenciales, en cambio, es básicamente un proxy de urbanización, que ya
+# entra por la densidad poblacional del barrio — bajarla sería pagar una
+# descarga enorme para duplicar una variable que ya tenemos.
+#
+# Y además `residential` es el 90% del volumen: incluirla hacía que cada tile
+# fuera tan grande que Overpass devolvía 504 en los dos espejos.
+PRINCIPALES = ("primary", "secondary", "trunk", "tertiary")
 
 # Equipamientos que generan circulación de gente y no son comercio (el comercio
 # ya lo tenemos del GIS, y meterlo de nuevo seria contar dos veces lo mismo).
@@ -58,6 +64,9 @@ ANCLAS = {
 # perder lo ya bajado.
 TILES = 4
 REINTENTOS = 3
+# Pausa entre tiles. Overpass es un servicio gratuito y compartido; encadenar
+# pedidos sin respirar hace que empiece a devolver 504 aunque cada uno sea chico.
+PAUSA_TILE = 2.0
 
 
 def _grilla() -> list[str]:
@@ -97,6 +106,7 @@ def _consultar(plantilla: str) -> list[dict]:
     for n, bbox in enumerate(_grilla(), 1):
         elementos.extend(_pedir(plantilla.format(bbox=bbox)))
         log.info("  tile %s/%s — %s elementos acumulados", n, TILES * TILES, f"{len(elementos):,}")
+        time.sleep(PAUSA_TILE)
     log.info("  total %s elementos en %.0fs", f"{len(elementos):,}", time.time() - inicio)
     return elementos
 
@@ -122,7 +132,7 @@ def _puntos(elementos: list[dict], tipo: str) -> pl.DataFrame:
 
 
 def descargar_vias() -> pl.DataFrame:
-    tipos = "|".join(PRINCIPALES + SECUNDARIAS)
+    tipos = "|".join(PRINCIPALES)
     consulta = f'[out:json][timeout:180];(way["highway"~"^({tipos})$"]({{bbox}}););out center tags;'
     log.info("Descargando red vial de OSM (tarda unos minutos)...")
     return _puntos(_consultar(consulta), "via")
