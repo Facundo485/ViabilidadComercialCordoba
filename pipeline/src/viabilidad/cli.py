@@ -115,6 +115,11 @@ def cmd_mapa(_) -> None:
     mapa.ejecutar()
 
 
+def cmd_fuga(_) -> None:
+    """¿El indicador publicado por el municipio se incluye a sí mismo? Sí."""
+    diagnostico.ejecutar_fuga()
+
+
 def cmd_score(_) -> None:
     """El score de viabilidad por manzana y rubro."""
     score.ejecutar()
@@ -188,6 +193,7 @@ COMANDOS = {
     "altura": cmd_altura,
     "geometria": cmd_geometria,
     "score": cmd_score,
+    "fuga": cmd_fuga,
     "mapa": cmd_mapa,
     "places": cmd_places,
     "todo": cmd_todo,
