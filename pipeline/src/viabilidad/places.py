@@ -364,6 +364,57 @@ def consultar(n: int | None = None) -> pl.DataFrame:
     return muestra.join(observadas, on="ultimo_tramite", how="inner")
 
 
+# Plaza San Martín. Sirve para partir la ciudad en anillos sin traer geometría.
+CENTRO = (-64.1810, -31.4167)
+KM_POR_GRADO_LON = 88.5
+KM_POR_GRADO_LAT = 111.3
+
+
+def estructura_espacial(r: pl.DataFrame) -> pl.DataFrame:
+    """¿El proxy falla más en unas zonas que en otras? Es el chequeo que decide.
+
+    Que el objetivo sea ruidoso no impide modelar: un error de medición repartido
+    parejo atenúa los efectos estimados hacia cero, o sea cuesta potencia, no
+    validez. Y potencia sobra con 62.560 períodos.
+
+    Lo que sí rompería un score de localización es que el error esté **ligado al
+    lugar**. Si el permiso vencido sin cerrar fuera más común en la periferia,
+    el mapa mediría formalidad administrativa y no supervivencia comercial, y
+    toda zona informal saldría mal puntuada por un artefacto.
+
+    Ojo con no confundirlo con la cobertura de Places, que sí varía con la
+    distancia: eso limita dónde podemos *verificar*, no dónde el proxy acierta.
+    """
+    con_km = r.with_columns(
+        (
+            ((pl.col("lon") - CENTRO[0]) * KM_POR_GRADO_LON) ** 2
+            + ((pl.col("lat") - CENTRO[1]) * KM_POR_GRADO_LAT) ** 2
+        )
+        .sqrt()
+        .alias("km_al_centro")
+    )
+    util = con_km.filter(pl.col("observado") != "sin_dato").with_columns(
+        (
+            ((pl.col("estado_predicho") == "cerrado") & (pl.col("observado") != "sigue_el_mismo"))
+            | ((pl.col("estado_predicho") == "abierto") & (pl.col("observado") == "sigue_el_mismo"))
+        )
+        .cast(pl.Int8)
+        .alias("acierto")
+    )
+    anillos = util.with_columns(
+        pl.col("km_al_centro").qcut(4, labels=["0 centro", "1", "2", "3 periferia"]).alias("anillo")
+    )
+    return (
+        anillos.group_by("anillo")
+        .agg(
+            pl.len().alias("n"),
+            pl.col("km_al_centro").median().round(1).alias("km_mediana"),
+            pl.col("acierto").mean().round(3).alias("exactitud"),
+        )
+        .sort("anillo")
+    )
+
+
 def calibrar(r: pl.DataFrame) -> pl.DataFrame:
     """Matriz de confusión: lo que predecimos contra lo que se observa.
 
@@ -404,6 +455,24 @@ def ejecutar(n: int | None = None) -> pl.DataFrame:
         ok = abiertos.filter(pl.col("observado") == "sigue_el_mismo").height
         print(
             f"  predichos ABIERTOS: {ok:,}/{len(abiertos):,} confirmados ({ok / len(abiertos):.1%})"
+        )
+
+    anillos = estructura_espacial(r)
+    print("\n¿El proxy falla más en unas zonas que en otras?")
+    with pl.Config(tbl_hide_dataframe_shape=True):
+        print(anillos)
+    brecha = anillos["exactitud"].max() - anillos["exactitud"].min()
+    if brecha > 0.15:
+        log.error(
+            "La exactitud del proxy varía %.0f puntos entre el centro y la periferia. "
+            "El objetivo está ligado al lugar: un score de localización construido "
+            "sobre esto mide formalidad administrativa, no supervivencia.",
+            brecha * 100,
+        )
+    else:
+        print(
+            f"  Brecha centro-periferia: {brecha:.1%}. El error del objetivo no está\n"
+            "  ligado al lugar, así que atenúa los efectos espaciales pero no los sesga."
         )
 
     salida = config.DIR_PROCESADO / ARCHIVO_RESULTADO
