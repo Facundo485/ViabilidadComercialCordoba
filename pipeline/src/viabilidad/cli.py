@@ -17,7 +17,9 @@ from . import (
     manzanas,
     mapeo,
     modelo,
+    osm,
     places,
+    poblacion,
     resumen,
     supervivencia,
     validacion,
@@ -77,6 +79,16 @@ def cmd_supervivencia(_) -> None:
     supervivencia.ejecutar()
 
 
+def cmd_osm(_) -> None:
+    """Descarga la red vial y los equipamientos de OSM (cachea en disco)."""
+    osm.ejecutar()
+
+
+def cmd_poblacion(_) -> None:
+    """Población, densidad, hogares y NBI por barrio."""
+    poblacion.ejecutar()
+
+
 def cmd_features(_) -> None:
     """Features del entorno comercial, medidas en la fecha de alta de cada local."""
     features.ejecutar()
@@ -130,6 +142,8 @@ COMANDOS = {
     "diagnostico": cmd_diagnostico,
     "supervivencia": cmd_supervivencia,
     "cohortes": cmd_cohortes,
+    "osm": cmd_osm,
+    "poblacion": cmd_poblacion,
     "features": cmd_features,
     "muestra": cmd_muestra,
     "modelo": cmd_modelo,

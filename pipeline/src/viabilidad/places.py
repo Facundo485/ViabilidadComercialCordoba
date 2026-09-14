@@ -430,6 +430,51 @@ def calibrar(r: pl.DataFrame) -> pl.DataFrame:
     )
 
 
+def techo_auc(r: pl.DataFrame) -> dict[str, float]:
+    """El AUC máximo que cualquier modelo puede sacar contra nuestra etiqueta.
+
+    La etiqueta que el modelo aprende no es la verdad: es un proxy con error
+    medido. Eso pone un techo que ninguna feature puede romper, y saberlo cambia
+    qué conviene hacer después — si estamos lejos del techo falta señal, y si
+    estamos cerca lo que falta es un objetivo mejor, no más variables.
+
+    El cálculo sale de la tabla de calibración. Para un predictor binario,
+    AUC = (sensibilidad + especificidad) / 2, y el AUC es simétrico entre las
+    dos variables: **lo bien que nuestra etiqueta predice la verdad es lo mismo
+    que lo bien que la verdad predeciría nuestra etiqueta**. O sea que un modelo
+    capaz de adivinar el desenlace real, medido contra nuestra etiqueta, no
+    pasaría de ese número.
+
+    Tres salvedades, porque el número es fuerte y conviene no sobrevenderlo:
+
+    - Toma a Places como verdad, y Places tiene su propio error.
+    - La etiqueta de la calibración (el permiso venció sin renovar) no es
+      idéntica a la del modelo (duró más que el primer vencimiento), aunque
+      están muy pegadas.
+    - Es el techo para predecir **la etiqueta ruidosa**. La capacidad real del
+      modelo sobre el desenlace verdadero es probablemente mayor, pero con este
+      objetivo no hay forma de medir cuánto.
+    """
+    util = r.filter(pl.col("observado") != "sin_dato").with_columns(
+        (pl.col("observado") == "sigue_el_mismo").alias("_verdad"),
+        (pl.col("estado_predicho") == "abierto").alias("_etiqueta"),
+    )
+    a = util.filter(pl.col("_etiqueta") & pl.col("_verdad")).height
+    b = util.filter(pl.col("_etiqueta") & ~pl.col("_verdad")).height
+    c = util.filter(~pl.col("_etiqueta") & pl.col("_verdad")).height
+    d = util.filter(~pl.col("_etiqueta") & ~pl.col("_verdad")).height
+    if not (a + c) or not (b + d):
+        raise ValueError("Falta una de las dos clases observadas; no hay techo que estimar.")
+
+    sensibilidad = a / (a + c)
+    especificidad = d / (b + d)
+    return {
+        "sensibilidad": sensibilidad,
+        "especificidad": especificidad,
+        "techo_auc": (sensibilidad + especificidad) / 2,
+    }
+
+
 def ejecutar(n: int | None = None) -> pl.DataFrame:
     r = consultar(n=n)
     print(f"\n{'=' * 72}\n  Calibración del proxy contra Google Places\n{'=' * 72}")
@@ -474,6 +519,15 @@ def ejecutar(n: int | None = None) -> pl.DataFrame:
             f"  Brecha centro-periferia: {brecha:.1%}. El error del objetivo no está\n"
             "  ligado al lugar, así que atenúa los efectos espaciales pero no los sesga."
         )
+
+    techo = techo_auc(r)
+    print(
+        f"\nTecho de AUC que impone el ruido del objetivo: {techo['techo_auc']:.3f}\n"
+        f"  (sensibilidad {techo['sensibilidad']:.3f}, "
+        f"especificidad {techo['especificidad']:.3f})\n"
+        "  Un modelo que adivinara el desenlace real no sacaría más que eso\n"
+        "  medido contra nuestra etiqueta. No es una meta: es el límite."
+    )
 
     salida = config.DIR_PROCESADO / ARCHIVO_RESULTADO
     r.write_csv(salida)

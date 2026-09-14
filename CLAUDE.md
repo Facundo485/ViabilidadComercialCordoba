@@ -174,11 +174,24 @@ Es un **piso**, no la calidad verdadera, porque la medición arrastra error
 propio: un local puede cambiar de nombre sin cerrar, el nombre de fantasía del
 GIS puede estar viejo, y Places no indexa todo (603 de 1.498 quedaron sin dato).
 
-**Qué implica para el producto.** El modelo tiene techo: no se puede prometer
-precisión por local que el objetivo no sostiene. El score se presenta agregado
-—manzana y rubro, donde el ruido promedia— y la limitación se declara junto al
-número. Esto no invalida el enfoque: el permiso sigue siendo el mejor proxy
-disponible y es el criterio del propio municipio.
+**El techo, cuantificado.** Para un predictor binario AUC = (sensibilidad +
+especificidad)/2, y el AUC es simétrico entre las dos variables: lo bien que
+nuestra etiqueta predice la verdad es lo mismo que lo bien que la verdad
+predeciría nuestra etiqueta. Con sensibilidad 0,630 y especificidad 0,585, el
+techo es **AUC 0,608**. Un modelo que adivinara el desenlace real, medido contra
+nuestra etiqueta, no sacaría más que eso.
+
+El modelo actual va **0,593** en validación temporal: el 87% del margen sobre
+0,5. **El cuello de botella no son las features, es la variable objetivo.**
+Sumar variables no va a mover mucho la aguja; la única palanca identificada para
+romper el 0,608 es etiquetar locales con Places —5.000 gratis por mes— y
+entrenar sobre ese subconjunto verificado.
+
+**Qué implica para el producto.** No se puede prometer precisión por local que
+el objetivo no sostiene. El score se presenta agregado —manzana y rubro, donde
+el ruido promedia— y la limitación se declara junto al número. Esto no invalida
+el enfoque: el permiso sigue siendo el mejor proxy disponible y es el criterio
+del propio municipio.
 
 **Limitaciones a declarar en el producto:**
 
@@ -336,6 +349,8 @@ React/
     │   ├── places.py         # consulta Places y calibra
     │   ├── features.py       # entorno comercial, medido a la fecha de alta
     │   ├── modelo.py         # validación espacial y temporal
+    │   ├── poblacion.py      # socioeconómico por barrio
+    │   ├── osm.py            # red vial y equipamientos desde OpenStreetMap
     │   └── cli.py
     └── tests/
 ```
@@ -359,6 +374,8 @@ python -m viabilidad muestra         # muestra para calibrar el proxy contra Pla
 python -m viabilidad places          # consulta Places (usa cache, no re-factura)
 python -m viabilidad features        # entorno comercial a la fecha de alta
 python -m viabilidad modelo          # ¿el entorno predice? validación espacial y temporal
+python -m viabilidad poblacion       # socioeconómico por barrio (población, NBI, IPS)
+python -m viabilidad osm             # red vial y equipamientos (cachea; tarda)
 ```
 
 ## Convenciones

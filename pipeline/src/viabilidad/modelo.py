@@ -58,6 +58,17 @@ ENTORNO = (
 )
 RUBRO = ("rubro_cod",)
 
+# Las únicas que no salen del churn comercial. Son de barrio y de 2025, así que
+# son gruesas y levemente anacrónicas, pero **no cambian con el período**: si la
+# capacidad de predecir hacia adelante va a mejorar, tiene que venir de acá.
+ESTRUCTURA = (
+    "poblacion",
+    "densidad_hab_km2",
+    "hogares",
+    "porc_hogares_nbi",
+    "indice_prioridad_social",
+)
+
 SPLITS_ESPACIALES = 5
 FRACCION_TRAIN = 0.7
 CORTES_TEMPORALES = (2016, 2017, 2018)
@@ -109,9 +120,21 @@ def validacion_espacial(d: pl.DataFrame) -> pl.DataFrame:
                 "n_test": len(test),
                 "solo_rubro": _auc(train, test, RUBRO),
                 "rubro_entorno": _auc(train, test, RUBRO + ENTORNO),
+                "mas_estructura": _auc(train, test, RUBRO + ENTORNO + _estructura(d)),
             }
         )
     return pl.DataFrame(filas)
+
+
+def _estructura(d: pl.DataFrame) -> tuple[str, ...]:
+    """Las columnas estructurales que efectivamente están en los datos."""
+    presentes = tuple(c for c in ESTRUCTURA if c in d.columns)
+    if not presentes:
+        log.warning(
+            "No hay features estructurales: corré `python -m viabilidad poblacion` y "
+            "volvé a generar las features. Sin ellas el modelo solo ve churn comercial."
+        )
+    return presentes
 
 
 def validacion_temporal(d: pl.DataFrame) -> pl.DataFrame:
@@ -129,6 +152,7 @@ def validacion_temporal(d: pl.DataFrame) -> pl.DataFrame:
                 "n_test": len(test),
                 "solo_rubro": _auc(train, test, RUBRO),
                 "rubro_entorno": _auc(train, test, RUBRO + ENTORNO),
+                "mas_estructura": _auc(train, test, RUBRO + ENTORNO + _estructura(d)),
             }
         )
     return pl.DataFrame(filas)
@@ -149,10 +173,12 @@ def ejecutar() -> tuple[pl.DataFrame, pl.DataFrame]:
 
     ganancia_e = (espacial["rubro_entorno"] - espacial["solo_rubro"]).mean()
     ganancia_t = (temporal["rubro_entorno"] - temporal["solo_rubro"]).mean()
-    print(
-        f"\nAporte del entorno sobre el rubro:  "
-        f"espacial {ganancia_e:+.3f}   temporal {ganancia_t:+.3f}"
-    )
+    extra_e = (espacial["mas_estructura"] - espacial["rubro_entorno"]).mean()
+    extra_t = (temporal["mas_estructura"] - temporal["rubro_entorno"]).mean()
+    print(f"\n{'aporte sobre el rubro':<34} espacial    temporal")
+    print(f"{'  entorno comercial':<34} {ganancia_e:+.3f}      {ganancia_t:+.3f}")
+    print(f"{'  + estructura socioeconómica':<34} {extra_e:+.3f}      {extra_t:+.3f}")
+    print(f"{'  total':<34} {ganancia_e + extra_e:+.3f}      {ganancia_t + extra_t:+.3f}")
 
     if ganancia_t < 0.02:
         log.warning(

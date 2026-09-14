@@ -32,7 +32,7 @@ import numpy as np
 import polars as pl
 from scipy.spatial import cKDTree
 
-from . import config, supervivencia
+from . import config, poblacion, supervivencia
 
 log = logging.getLogger(__name__)
 
@@ -69,12 +69,56 @@ def _base() -> pl.DataFrame:
     if sin_punto := d["lon"].null_count():
         log.warning("%s períodos sin coordenadas: quedan fuera.", f"{sin_punto:,}")
 
+    d = _con_socioeconomico(d)
+
     return d.filter(pl.col("lon").is_not_null() & pl.col("lat").is_not_null()).with_columns(
         # Un período puede tener varios rubros. Para "competencia del mismo
         # rubro" hace falta uno solo, y se toma el primero en orden alfabético:
         # es arbitrario pero estable, y no se usa para nada más que emparejar.
         pl.col("nivel2").list.sort().list.first().alias("rubro_principal")
     )
+
+
+SOCIOECONOMICAS = (
+    "poblacion",
+    "densidad_hab_km2",
+    "hogares",
+    "porc_hogares_nbi",
+    "indice_prioridad_social",
+)
+
+
+def _con_socioeconomico(d: pl.DataFrame) -> pl.DataFrame:
+    """Adjunta las variables de barrio, si están descargadas.
+
+    Son las únicas features del modelo que **no** salen del churn comercial, y
+    por eso son las candidatas a transferir en el tiempo: la composición
+    socioeconómica de un barrio se mueve mucho más despacio que sus locales.
+
+    Van como opcionales a propósito: el pipeline tiene que poder correr sin
+    haber bajado esta capa, y el modelo avisa si no están.
+    """
+    archivo = config.DIR_CRUDO / poblacion.ARCHIVO
+    if not archivo.exists():
+        log.warning(
+            "Falta %s: las features quedan sin las variables de barrio. "
+            "Corré `python -m viabilidad poblacion`.",
+            archivo.name,
+        )
+        return d
+
+    barrios = pl.read_parquet(archivo)
+    unido = d.with_columns(poblacion._normalizar_barrio("barrio").alias("_barrio")).join(
+        barrios.rename({"barrio_norm": "_barrio"}), on="_barrio", how="left"
+    )
+    sin_match = unido["poblacion"].null_count()
+    if sin_match:
+        log.warning(
+            "%s de %s períodos no matchearon con ningún barrio del censo.",
+            f"{sin_match:,}",
+            f"{len(unido):,}",
+        )
+    return unido.drop("_barrio")
 
 
 def _proyectar(d: pl.DataFrame) -> np.ndarray:
@@ -137,7 +181,7 @@ def calcular(d: pl.DataFrame | None = None) -> pl.DataFrame:
 
         log.info("  %s/%s períodos", f"{hasta:,}", f"{n:,}")
 
-    crudas = d.select(
+    columnas = [
         "ultimo_tramite",
         "manzana",
         "barrio",
@@ -146,7 +190,9 @@ def calcular(d: pl.DataFrame | None = None) -> pl.DataFrame:
         "inicio",
         "duracion",
         "evento",
-    ).with_columns(**{k: pl.Series(v) for k, v in salidas.items()})
+        *[c for c in SOCIOECONOMICAS if c in d.columns],
+    ]
+    crudas = d.select(columnas).with_columns(**{k: pl.Series(v) for k, v in salidas.items()})
     # "No había vecinos previos" es no saber, no un cero: va como null y no como
     # NaN, que además contaminaría la media de la cohorte al relativizar.
     crudas = crudas.with_columns(

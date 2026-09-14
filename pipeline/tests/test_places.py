@@ -85,3 +85,33 @@ def test_sin_resultados_es_sin_dato_y_no_un_cierre():
     """El error de siempre en este proyecto: convertir "no sé" en "cerró"."""
     assert places._interpretar({}, {"nombrefantasia": "X"})["observado"] == "sin_dato"
     assert places._interpretar({"places": []}, {"nombrefantasia": "X"})["observado"] == "sin_dato"
+
+
+def test_el_techo_sale_de_la_sensibilidad_y_la_especificidad():
+    """Con una etiqueta perfecta el techo es 1; con una etiqueta al azar, 0,5."""
+    import polars as pl
+
+    def tabla(aciertos: int, errores: int) -> pl.DataFrame:
+        filas = []
+        filas += [{"observado": "sigue_el_mismo", "estado_predicho": "abierto"}] * aciertos
+        filas += [{"observado": "otro_negocio", "estado_predicho": "cerrado"}] * aciertos
+        filas += [{"observado": "sigue_el_mismo", "estado_predicho": "cerrado"}] * errores
+        filas += [{"observado": "otro_negocio", "estado_predicho": "abierto"}] * errores
+        return pl.DataFrame(filas)
+
+    assert places.techo_auc(tabla(100, 0))["techo_auc"] == 1.0
+    assert places.techo_auc(tabla(50, 50))["techo_auc"] == 0.5
+    assert 0.5 < places.techo_auc(tabla(70, 30))["techo_auc"] < 1.0
+
+
+def test_el_sin_dato_no_entra_en_el_techo():
+    """Meterlo de un lado sería el mismo error que rellenar la censura."""
+    import polars as pl
+
+    base = [
+        {"observado": "sigue_el_mismo", "estado_predicho": "abierto"},
+        {"observado": "otro_negocio", "estado_predicho": "cerrado"},
+    ] * 50
+    con_ruido = [*base, *([{"observado": "sin_dato", "estado_predicho": "abierto"}] * 500)]
+
+    assert places.techo_auc(pl.DataFrame(con_ruido)) == places.techo_auc(pl.DataFrame(base))

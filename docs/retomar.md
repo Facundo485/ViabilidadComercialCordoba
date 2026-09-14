@@ -14,9 +14,10 @@ Paso 1  [OK]         La tasa vieja medía la época, no la supervivencia. Confir
 Paso 2  [OK]         Renovaciones encadenadas con el titular de la vista.
 Paso 2b [OK]         Estratificado por cohorte: el efecto de rubro existe y es
                      estable entre cohortes independientes (rho 0,68).
-Paso 3  [A MEDIAS]   Features hechas. El entorno separa lugares dentro de un
-                     período (AUC 0,60 -> 0,66) pero casi no predice hacia
-                     adelante (+0,006). Ver abajo.                           <-- acá
+Paso 3  [OK]         Features hechas, incluidas las socioeconómicas.
+VEREDICTO            El modelo está al 87% del techo que impone el ruido del
+                     objetivo. El cuello de botella NO son las features: es la
+                     variable objetivo. Ver "¿Vale la pena seguir?".          <-- acá
 Places  [OK]         Proxy calibrado: 61,0% de exactitud contra 55,3% de base.
                      Tiene señal real, pero es ruidoso. Ver abajo.
 ```
@@ -326,15 +327,74 @@ una capacidad que el modelo no tiene.
 Y el producto necesita justamente la extrapolación temporal: alguien parado hoy
 frente a un local vacío pregunta por el futuro, no por otro barrio.
 
-### Qué sigue, entonces
+### Las features estructurales, y qué cambiaron
 
-1. **Sumar features estructurales**, que es lo que falta y lo que debería
-   transferir mejor en el tiempo: zonificación (dataset `3011`), población por
-   radio censal (INDEC 2022), red vial y POIs (OSM). Las que tenemos hoy salen
-   todas del mismo churn comercial, que es justamente lo que cambia de período
-   a período.
-2. **Revisar el techo.** El objetivo tiene 61% de exactitud medida; parte de
-   este 0,57 es ruido del target y no falta de señal. Conviene estimar cuánto.
+`python -m viabilidad poblacion` baja población, densidad, hogares, % de
+hogares con NBI e índice de prioridad social **por barrio**, de dos capas del
+mismo GIS municipal. Son las únicas features que no salen del churn comercial.
+
+```
+aporte sobre el rubro              espacial    temporal
+  entorno comercial                +0,063      +0,011
+  + estructura socioeconómica      +0,001      +0,010
+  total                            +0,063      +0,021
+```
+
+**Confirma la hipótesis:** lo estructural no agrega nada espacialmente pero casi
+duplica el aporte temporal. Lo que cambia de período a período es el churn
+comercial; lo socioeconómico se queda quieto y por eso transfiere.
+
+Limitaciones a declarar: son de **2025** aplicadas a locales desde 2014 (leve
+anacronismo, aceptable porque la estructura de un barrio se mueve despacio) y
+son de **barrio**, unidad gruesa para un score de manzana — el propio
+diccionario del municipio avisa que "no reflejan la realidad territorial".
+
+Queda pendiente OSM (red vial y equipamientos): `python -m viabilidad osm`, con
+la consulta partida en tiles porque Overpass devuelve 504 con la ciudad entera.
+
+---
+
+## ¿Vale la pena seguir? El techo
+
+`python -m viabilidad places` calcula el **techo de AUC que impone el ruido del
+objetivo**, y es el número que más cambia las prioridades del proyecto.
+
+La etiqueta que el modelo aprende no es la verdad: es un proxy con error medido
+contra Places. Para un predictor binario AUC = (sensibilidad + especificidad)/2,
+y el AUC es simétrico entre las dos variables, así que **lo bien que nuestra
+etiqueta predice la verdad es lo mismo que lo bien que la verdad predeciría
+nuestra etiqueta**:
+
+```
+sensibilidad  P(decimos abierto | sigue abierto)  = 0,630
+especificidad P(decimos cerrado | cerró)          = 0,585
+techo de AUC                                       = 0,608
+
+modelo actual (temporal, con estructura)           = 0,593
+aprovechado del margen sobre 0,5                   = 87%
+```
+
+**Un modelo que adivinara el desenlace real, medido contra nuestra etiqueta, no
+sacaría más de 0,608.** Estamos en 0,593.
+
+Eso da vuelta el diagnóstico. El 0,59 no es un modelo flojo: es un modelo que ya
+extrae casi todo lo extraíble **de este objetivo**. Sumar features no va a mover
+mucho la aguja; lo que hay que mejorar es la variable objetivo.
+
+Salvedades, porque el número es fuerte: toma a Places como verdad y Places tiene
+su propio error; la etiqueta de la calibración no es idéntica a la del modelo; y
+es el techo para predecir *la etiqueta ruidosa* — la capacidad real sobre el
+desenlace verdadero es probablemente mayor, pero con este objetivo no se puede
+medir cuánto.
+
+### Lo que sigue, entonces
+
+1. **Mejorar el objetivo, no las features.** La palanca concreta: la cuota de
+   Places es de 5.000 llamadas gratis **por mes**. En unos meses se pueden
+   etiquetar ~15.000 locales con desenlace verificado y entrenar sobre ese
+   subconjunto, con un objetivo mucho más limpio. Es la única vía identificada
+   para romper el 0,608.
+2. Terminar OSM, que está a mitad de camino, pero sin esperar mucho de él.
 3. No tocar el corte temporal para que dé mejor. Es el número honesto.
 
 ---
