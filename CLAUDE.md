@@ -113,6 +113,23 @@ supervivencia de ciudad de 33,1% con sus propios conteos precalculados; la
 derivación desde las fechas de la tabla 1, sin mirar esos conteos, da ~33%. Dos
 fuentes independientes, el mismo número.
 
+**El municipio no registra los cierres, y no es un olvido.** Un cierre es un
+no-evento: nadie va a avisar que cerró. Se revisó toda la fuente y no hay dónde
+buscarlos — `activa` y `tarjeta_activa` de la vista vienen nulas en el 100%,
+`idtipotramite` es la categoría de riesgo y no alta/baja, `status` es del
+geocodificador, el servicio de evolución solo cuenta altas, y ninguno de los 183
+datasets del portal abierto tiene bajas ni ceses. Por eso `vigente` está sin
+poblar: el campo existe, el trámite que lo llenaría no.
+
+Tampoco alcanza con mirar quién habilitó después en la misma dirección: de
+37.146 sucesiones de titular en una parcela, 32.325 se solapan más de seis meses
+(son locales que conviven, no un relevo). Afinando a calle y altura, o a
+superficie, quedan menos todavía.
+
+La consecuencia es que el evento observable sigue siendo **si renovó**, y que su
+calidad hay que medirla contra una fuente externa en vez de asumirla: para eso
+está `validacion.py`.
+
 **Limitaciones a declarar en el producto:**
 
 - Permiso vigente no es lo mismo que local abierto. Alguien puede cerrar sin dar
@@ -198,7 +215,7 @@ no otorga el permiso. Aplicarla antes de scorear.
 ### Requieren gestión
 | Fuente | Vía |
 |---|---|
-| Google Places API | Cuenta de facturación (tier gratuito). Plan C para cierres, ya no necesario |
+| Google Places API | Cuenta de facturación (tier gratuito). **Vuelve a hacer falta**, en otro rol: no como variable objetivo sino para *calibrar* el proxy de renovación. `businessStatus` es la única señal de cierre directa y por local que existe. Ver `validacion.py` |
 | Tráfico en tiempo real | TomTom Traffic Flow: 2500 requests/día gratis, sin tarjeta. Devuelve `currentSpeed` y `freeFlowSpeed` por segmento |
 
 Los pedidos de acceso a información pública a la Municipalidad de Córdoba y al
@@ -256,6 +273,7 @@ React/
     │   ├── resumen.py         # CSV agregados para revisar o commitear
     │   ├── diagnostico.py     # chequea que la tasa no mida antigüedad
     │   ├── supervivencia.py   # Kaplan-Meier sobre períodos de actividad
+    │   ├── validacion.py      # muestra para calibrar el proxy contra Places
     │   └── cli.py
     └── tests/
 ```
@@ -275,6 +293,7 @@ Comandos:
 python -m viabilidad {rubros|mapeo|ingest|manzanas|resumen|todo}
 python -m viabilidad diagnostico     # ¿la tasa mide el nomenclador? (no necesita red)
 python -m viabilidad supervivencia   # Kaplan-Meier por rubro (necesita ingest previo)
+python -m viabilidad muestra         # muestra para calibrar el proxy contra Places
 ```
 
 ## Convenciones

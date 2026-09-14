@@ -81,7 +81,7 @@ def descargar_tramites() -> pl.DataFrame:
         arcgis.paginar(
             config.GIS_BASE_VISTA,
             config.CAPA_TRAMITES,
-            con_geometria=False,
+            con_geometria=True,
             page_size=config.PAGE_SIZE,
         )
     )

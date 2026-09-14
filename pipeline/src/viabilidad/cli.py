@@ -7,7 +7,17 @@ import logging
 
 import polars as pl
 
-from . import arcgis, config, diagnostico, ingest, manzanas, mapeo, resumen, supervivencia
+from . import (
+    arcgis,
+    config,
+    diagnostico,
+    ingest,
+    manzanas,
+    mapeo,
+    resumen,
+    supervivencia,
+    validacion,
+)
 
 
 def _log():
@@ -63,6 +73,11 @@ def cmd_supervivencia(_) -> None:
     supervivencia.ejecutar()
 
 
+def cmd_muestra(_) -> None:
+    """Muestra para calibrar el proxy de cierre contra Google Places."""
+    validacion.ejecutar()
+
+
 def cmd_todo(args) -> None:
     ingest.ejecutar()
     _resumen(manzanas.ejecutar())
@@ -90,6 +105,7 @@ COMANDOS = {
     "resumen": cmd_resumen,
     "diagnostico": cmd_diagnostico,
     "supervivencia": cmd_supervivencia,
+    "muestra": cmd_muestra,
     "todo": cmd_todo,
 }
 

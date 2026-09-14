@@ -40,6 +40,15 @@ CAMPOS_TRAMITE = [
     "superficietotal",
     "superficiecubierta",
     "superficiedeposito",
+    # Dirección y punto del local. La dirección comercial es pública (está en el
+    # GIS) y hace falta para poder cruzar contra fuentes externas; el punto es
+    # del trámite, más fino que el centroide de la parcela (lon/lat salen de la
+    # geometría, no de los campos `x`/`y`, que la capa expone vacíos).
+    "calle",
+    "numero",
+    "domicilio_loc",
+    "lon",
+    "lat",
 ]
 
 # El servidor declara maxRecordCount=2000 pero acepta hasta standardMaxRecordCount.

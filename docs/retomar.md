@@ -26,6 +26,7 @@ pip install -e '.[dev]'
 
 python -m viabilidad ingest          # ahora baja también la vista de trámites
 python -m viabilidad supervivencia
+python -m viabilidad muestra         # muestra para calibrar contra Places
 ```
 
 **El `ingest` hay que rehacerlo sí o sí** si el `data/crudo/` es de antes del
@@ -87,19 +88,63 @@ llamativo, buscar primero el artefacto.
 
 ---
 
+## Hallazgo del 13/09: el outlier era taxonomía, no censura
+
+`bar_restaurante` daba 95% porque **su gemelo viejo está clasificado como
+panadería**. El nomenclador municipal mete toda la gastronomía en una entrada
+—"Bar, confiterías, pizzerías, lomiterías, empanaderías, parrilla, trattoria…"—
+y `mapeo_rubros.csv` la manda a `panaderia`: son 2.896 habilitaciones, el 47%
+de ese rubro. Como el CLANAE nuevo sí tiene `bar_restaurante`, el rubro quedó
+partido en dos por época, y la supervivencia de cada mitad es la de su época.
+
+`cafeteria` tampoco es cafetería: sus entradas top son "venta de masas y
+productos de pastelería" y "venta de café, té y yerba mate" — un negocio de
+granos, no un bar.
+
+**Hay 13 de 73 rubros que existen bajo un solo nomenclador** (<5% o >95% de
+filas en el nuevo). Esos son, por construcción, rubros que codifican época:
+
+```
+solo viejo:  intermediarios, regaleria, cafeteria, locutorio
+solo nuevo:  comercio_otros, espectaculos, bar_restaurante, electrodomesticos,
+             fiambreria, veterinaria, ortopedia, forrajeria, optica
+```
+
+Otros errores vistos de paso: `forrajeria` contiene "SERVICIOS MÉDICOS PARA
+ANIMALES (VETERINARIA)" (355) mientras `veterinaria` existe aparte con 235; y
+`espectaculos` es en realidad instalaciones deportivas (canchas de paddle,
+tenis, fútbol).
+
+**Arreglar el mapeo es probablemente la mitad del Paso 2b**, y se hace editando
+`referencia/mapeo_rubros.csv` fila por fila, que es para lo que existe ese CSV.
+
+---
+
 ## Lo que sigue (Paso 2b)
 
-1. **Entender por qué `bar_restaurante` sigue dando ~95%.** La sospecha es que
-   es un rubro que solo existe en el nomenclador nuevo, así que todos sus spells
-   son recientes y quedan censurados. Si es eso, el problema no es Kaplan-Meier
-   sino que hay rubros sin cohortes viejas y no se pueden comparar contra los
-   que sí las tienen.
+1. **Arreglar el mapeo de rubros** (ver la sección de arriba). Empezar por
+   sacar la gastronomía vieja de `panaderia` y unirla con `bar_restaurante`, y
+   por los 13 rubros segregados por nomenclador. Después volver a medir la
+   correlación con la época: si baja mucho, el resto del Paso 2b es más chico
+   de lo que parece.
 2. **Medir `s5` dentro de cohortes de alta fijas** (una curva por rubro y año de
    alta) en vez de mezclar doce años de altas en una sola curva. Si el orden
    entre rubros se mantiene dentro de cada cohorte, la señal es real.
 3. **Ajustar por época explícitamente** —el año de alta como covariable en un
    Cox— en lugar de esperar que la censura lo resuelva sola.
 4. Recién con eso, el Paso 3.
+
+**En paralelo, la calibración contra Places.** `python -m viabilidad muestra`
+deja 1.500 locales en `data/procesado/muestra_places.csv`, mitad predichos
+cerrados y mitad abiertos, estratificados por grupo de rubro, con dirección y
+coordenadas y **sin titular**. Falta la clave de API: va en `pipeline/.env`
+como `GOOGLE_PLACES_API_KEY` (ya está gitignoreado). El script que consulta
+Places se escribe cuando exista la clave, para poder probarlo de verdad en vez
+de entregarlo a ciegas.
+
+Lo que va a dar: de los que llamamos cerrados, cuántos Places confirma
+`CLOSED_PERMANENTLY`, y de los que llamamos abiertos, cuántos `OPERATIONAL`.
+Eso convierte el proxy de supuesto en número medido.
 
 Un criterio de cierre concreto: la correlación entre `s5` y el año mediano del
 rubro tiene que bajar a algo que se pueda explicar por el negocio y no por el

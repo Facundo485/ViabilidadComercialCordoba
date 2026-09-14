@@ -197,6 +197,9 @@ def consolidar_tramites(t: pl.DataFrame) -> pl.DataFrame:
             pl.col("fechahabaprobada").min().alias("inicio"),
             pl.col("fechavencimientohab").max().alias("fin_cobertura"),
             pl.len().alias("tramites"),
+            # El último trámite del período: es el que tiene la dirección y el
+            # rubro con los que el local llegó hasta donde lo vemos.
+            pl.col("id_tramite").last().alias("ultimo_tramite"),
             pl.col("nivel2").explode(empty_as_null=False).unique(),
             pl.col("nivel1").explode(empty_as_null=False).unique(),
             pl.col("manzana").first(),
