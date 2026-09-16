@@ -1,6 +1,7 @@
 """Configuración del pipeline: fuentes de datos y parámetros del dominio."""
 
 import os
+import secrets
 from pathlib import Path
 
 # --- Fuente: GIS de la Municipalidad de Córdoba -----------------------------
@@ -73,7 +74,6 @@ PAGE_SIZE_FALLBACK = 2_000
 #
 # La sal se puede fijar por entorno para que el hash no sea reproducible fuera
 # de esta máquina; el default deja el pipeline corriendo de cero sin configurar.
-SAL_CUIT = os.environ.get("VIABILIDAD_SAL_CUIT", "viabilidad-cordoba")
 LARGO_HASH_CUIT = 8  # bytes, 16 hex. De sobra para 47k titulares sin colisiones.
 
 # --- Limpieza ---------------------------------------------------------------
@@ -103,3 +103,33 @@ DIR_PROCESADO = DIR_DATOS / "procesado"
 # Tablas de referencia chicas que sí se versionan: son el insumo para decidir
 # el mapeo de rubros y conviene verlas en el diff cuando cambian.
 DIR_REFERENCIA = RAIZ / "referencia"
+
+
+ARCHIVO_SAL = DIR_DATOS / ".sal"
+
+
+def sal_cuit() -> str:
+    """La sal del hash de CUIT. Aleatoria por instalación, nunca versionada.
+
+    Tuvo un default fijo en el código hasta que el repo se hizo público, y ahí
+    dejó de servir: el espacio de CUITs es de ~10^8 por prefijo, así que con la
+    sal conocida cualquiera que consiga un dataset hasheado revierte la
+    seudonimización por fuerza bruta en minutos. Una sal pública es lo mismo que
+    no tener sal.
+
+    Se genera sola la primera vez y queda en `data/`, que está gitignoreado. Eso
+    la mantiene estable entre corridas —si cambiara, los trámites de un mismo
+    titular dejarían de encadenarse y la supervivencia volvería a medir el plazo
+    del permiso— sin que nadie tenga que configurar nada.
+    `VIABILIDAD_SAL_CUIT` la pisa, para reproducir un dataset viejo.
+    """
+    del_entorno = os.environ.get("VIABILIDAD_SAL_CUIT")
+    if del_entorno:
+        return del_entorno
+    if ARCHIVO_SAL.exists():
+        return ARCHIVO_SAL.read_text().strip()
+    ARCHIVO_SAL.parent.mkdir(parents=True, exist_ok=True)
+    sal = secrets.token_hex(16)
+    ARCHIVO_SAL.write_text(sal)
+    ARCHIVO_SAL.chmod(0o600)
+    return sal

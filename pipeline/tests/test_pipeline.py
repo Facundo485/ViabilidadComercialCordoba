@@ -245,3 +245,18 @@ def test_un_tramite_no_se_cuenta_dos_veces_en_el_mismo_rubro(monkeypatch, datos)
     gemelo = dict(duplicado, objectid=999_998, rubronombre="VENTA AL POR MENOR EN MINIMERCADOS")
 
     assert total_almacen([*historial, duplicado, gemelo]) == antes + 1
+
+
+def test_la_sal_del_hash_no_esta_en_el_codigo(tmp_path, monkeypatch):
+    """Una sal publicada es lo mismo que no tener sal: el CUIT se enumera."""
+    monkeypatch.delenv("VIABILIDAD_SAL_CUIT", raising=False)
+    monkeypatch.setattr(config, "ARCHIVO_SAL", tmp_path / ".sal")
+    primera = config.sal_cuit()
+    assert len(primera) >= 32
+    # Estable entre corridas: si cambiara, los tramites de un mismo titular
+    # dejarian de encadenarse y la supervivencia volveria a medir el plazo.
+    assert config.sal_cuit() == primera
+
+    otra = tmp_path / "otra" / ".sal"
+    monkeypatch.setattr(config, "ARCHIVO_SAL", otra)
+    assert config.sal_cuit() != primera

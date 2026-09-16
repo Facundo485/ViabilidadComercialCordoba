@@ -54,14 +54,14 @@ def seudonimo(cuit: str | None) -> str | None:
 
     Estable entre corridas (misma sal, mismo hash) y suficiente para agrupar:
     lo único que se le pide al identificador de titular es que dos trámites de
-    la misma persona caigan juntos. Ver la nota de `config.SAL_CUIT` sobre por
+    la misma persona caigan juntos. Ver la nota de `config.sal_cuit()` sobre por
     qué esto es seudonimización y no anonimización.
     """
     if cuit is None or not str(cuit).strip():
         return None
     return hashlib.blake2b(
         str(cuit).strip().encode(),
-        key=config.SAL_CUIT.encode(),
+        key=config.sal_cuit().encode(),
         digest_size=config.LARGO_HASH_CUIT,
     ).hexdigest()
 
