@@ -109,10 +109,30 @@ def calcular() -> tuple[pl.DataFrame, list[str], float]:
         .to_list()
     )
 
+    # La superficie se fija en la mediana del rubro, no se promedia por manzana.
+    #
+    # Es la feature con más peso —de 9,8% a 19,6% de supervivencia entre el
+    # cuartil más chico y el más grande— pero es un atributo del **negocio**, no
+    # del lugar. Promediada por manzana, una cuadra con cuatro habilitaciones y
+    # un galpón de 2.000 m² quedaba con score altísimo, y el mapa terminaba
+    # respondiendo "qué tan grandes eran los locales que abrieron acá" en vez de
+    # "qué tan buena es esta ubicación". Lo noto alguien mirando el mapa y
+    # preguntando por qué la periferia puntuaba bien en indumentaria.
+    #
+    # Fijándola, el score contesta la pregunta que corresponde: un local típico
+    # de ese rubro, abierto acá.
     entorno = _entorno_actual(entrenamiento, [c for c in columnas if c != "rubro_cod"])
+    superficie = entrenamiento.group_by("rubro_principal").agg(
+        pl.col("superficietotal").median().alias("sup_tipica")
+    )
+    tipica = dict(zip(superficie["rubro_principal"], superficie["sup_tipica"], strict=True))
+
     filas = []
     for rubro in rubros:
-        x = entorno.with_columns(pl.lit(codigos[rubro]).alias("rubro_cod")).select(columnas)
+        x = entorno.with_columns(
+            pl.lit(codigos[rubro]).alias("rubro_cod"),
+            pl.lit(tipica[rubro]).alias("superficietotal"),
+        ).select(columnas)
         p = m.predict_proba(x.to_numpy())[:, 1]
         filas.append(
             entorno.select("manzana").with_columns(

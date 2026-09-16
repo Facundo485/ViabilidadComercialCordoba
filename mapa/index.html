@@ -194,6 +194,15 @@ h1 {
 .gran-num small { font-size: 16px; font-weight: 500; color: var(--ink-soft); }
 .delta { margin: 7px 0 0; font-size: 12px; line-height: 1.5; color: var(--ink-soft); }
 .delta b { color: var(--ink); font-weight: 600; }
+/* Aviso de poca evidencia. Es la misma crítica que le hacemos al indicador del
+   municipio —un veredicto sobre una cuadra a partir de uno o dos locales— y
+   sería deshonesto no aplicárnosla. */
+.poca {
+  margin: 10px 0 0; padding: 7px 9px;
+  background: var(--surface-2); border-radius: 6px;
+  font-size: 11.5px; line-height: 1.45; color: var(--ink-soft);
+}
+.poca[hidden] { display: none; }
 .datos { margin: 12px 0 0; padding-top: 11px; border-top: 1px solid var(--line); }
 .dato { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; padding: 3px 0; }
 .dato dt { color: var(--ink-faint); }
@@ -345,6 +354,7 @@ h1 {
   <div class="barrio" id="fBarrio"></div>
   <div class="gran-num"><span id="fScore"></span><small>%</small></div>
   <p class="delta" id="fDelta"></p>
+  <p class="poca" id="fPoca" hidden></p>
   <dl class="datos">
     <div class="dato"><dt>Rubro</dt><dd id="fRubro"></dd></div>
     <div class="dato"><dt>Habilitaciones 2014-2026</dt><dd id="fHab"></dd></div>
@@ -788,6 +798,7 @@ h1 {
       document.getElementById("fRubro").textContent = "—";
       document.getElementById("fHab").textContent = "0";
       document.getElementById("fPct").textContent = "—";
+      document.getElementById("fPoca").hidden = true;
       return;
     }
 
@@ -798,6 +809,18 @@ h1 {
     document.getElementById("fRubro").textContent = nombre(rubros[idx]);
     document.getElementById("fHab").textContent = f.n;
     document.getElementById("fPct").textContent = percentil(val) + "º";
+    // El score se apoya en el entorno y no solo en la manzana, así que con poca
+    // historia propia sigue siendo informativo. Pero conviene decirlo.
+    var poca = document.getElementById("fPoca");
+    if (f.n < 4) {
+      poca.textContent = "Esta manzana tuvo " + f.n +
+        (f.n === 1 ? " habilitación" : " habilitaciones") +
+        " en doce años. El score se apoya sobre todo en las manzanas de alrededor.";
+      poca.hidden = false;
+    } else {
+      poca.hidden = true;
+    }
+
     var d = document.getElementById("fDelta");
     if (Math.abs(dif) < 0.35) {
       d.innerHTML = "En el promedio del rubro para la ciudad.";

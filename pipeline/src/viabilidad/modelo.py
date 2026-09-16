@@ -75,6 +75,7 @@ ESTRUCTURA = (
     "hogares",
     "porc_hogares_nbi",
     "indice_prioridad_social",
+    "km_al_centro",
 )
 
 SPLITS_ESPACIALES = 5

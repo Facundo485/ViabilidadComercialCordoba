@@ -69,7 +69,14 @@ def _base() -> pl.DataFrame:
     if sin_punto := d["lon"].null_count():
         log.warning("%s períodos sin coordenadas: quedan fuera.", f"{sin_punto:,}")
 
-    d = _con_socioeconomico(d)
+    d = _con_socioeconomico(d).with_columns(
+        (
+            ((pl.col("lon") - CENTRO[0]) * KM_POR_GRADO_LON) ** 2
+            + ((pl.col("lat") - CENTRO[1]) * KM_POR_GRADO_LAT) ** 2
+        )
+        .sqrt()
+        .alias("km_al_centro")
+    )
 
     return d.filter(pl.col("lon").is_not_null() & pl.col("lat").is_not_null()).with_columns(
         # Un período puede tener varios rubros. Para "competencia del mismo
@@ -79,12 +86,22 @@ def _base() -> pl.DataFrame:
     )
 
 
+# Plaza San Martín. La distancia al centro es la variable estructural más obvia
+# de una ciudad monocéntrica y faltaba: entra como feature para que el modelo
+# decida cuánto pesa, en vez de imponerle una penalización a mano —que sería
+# hacer que el mapa diga lo que esperamos y no lo que dicen los datos—.
+CENTRO = (-64.1810, -31.4167)
+KM_POR_GRADO_LON = 88.5
+KM_POR_GRADO_LAT = 111.3
+
+
 SOCIOECONOMICAS = (
     "poblacion",
     "densidad_hab_km2",
     "hogares",
     "porc_hogares_nbi",
     "indice_prioridad_social",
+    "km_al_centro",
 )
 
 
