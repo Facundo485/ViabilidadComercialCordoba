@@ -115,6 +115,11 @@ def cmd_mapa(_) -> None:
     mapa.ejecutar()
 
 
+def cmd_calibracion(_) -> None:
+    """El mapa contra la realidad, por barrio. La auditoría de dominio."""
+    modelo.ejecutar_calibracion()
+
+
 def cmd_valor(_) -> None:
     """¿Conviene etiquetar más locales con Places? La curva dice que no."""
     places.ejecutar_valor()
@@ -200,6 +205,7 @@ COMANDOS = {
     "score": cmd_score,
     "fuga": cmd_fuga,
     "valor": cmd_valor,
+    "calibracion": cmd_calibracion,
     "mapa": cmd_mapa,
     "places": cmd_places,
     "todo": cmd_todo,

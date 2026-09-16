@@ -236,3 +236,89 @@ def ejecutar() -> tuple[pl.DataFrame, pl.DataFrame]:
     temporal.write_csv(config.RAIZ / "validacion_temporal.csv")
     print(f"\nEscrito validacion_espacial.csv y validacion_temporal.csv en {config.RAIZ}")
     return espacial, temporal
+
+
+# ---------------------------------------------------------------------------
+# La auditoría que ningún score debería saltearse: contrastar contra alguien que
+# conoce la ciudad.
+# ---------------------------------------------------------------------------
+
+MIN_LOCALES_BARRIO = 25
+
+
+def calibracion_por_barrio(rubro: str = "bar_restaurante") -> pl.DataFrame:
+    """Lo que el mapa predice por barrio contra lo que efectivamente pasó.
+
+    Nació de una observación de dominio —"en Güemes y Nueva Córdoba hay muchos
+    bares y el mapa los pone tres puntos abajo"— y confirmó dos cosas.
+
+    **La primera es una limitación real.** El modelo correlaciona 0,77 con lo
+    observado y acierta el promedio de ciudad, pero **comprime hacia la media**:
+    subestima los barrios buenos (Güemes 14,6% real contra 10,4% predicho, Poeta
+    Lugones 25,6% contra 16,1%) y sobreestima los malos. No es un error
+    corregible con más variables —se probó agregar la historia del rubro en el
+    barrio y aporta +0,002 con el signo inestable—: es lo que un modelo con AUC
+    0,59 contra un techo de 0,61 tiene que hacer. Jugarse predicciones extremas
+    con esta señal sería sobreajustar.
+
+    **La segunda es un hallazgo.** Los barrios con más bares son los de menor
+    supervivencia individual: Centro tiene 509 y sobrevive el 9%, Poeta Lugones
+    tiene 43 y sobrevive el 25,6%. Un corredor gastronómico excelente rota más
+    rápido, porque el alquiler y la competencia se quedan con el margen.
+
+    Eso obliga a ser preciso sobre qué mide el score: **la probabilidad de que
+    un negocio sobreviva, no la calidad de la ubicación.** Son cosas distintas y
+    en gastronomía apuntan para lados opuestos.
+    """
+    d = _datos().filter(pl.col("rubro_principal") == rubro)
+    archivo = config.DIR_PROCESADO / "score_manzanas.parquet"
+    if not archivo.exists():
+        raise FileNotFoundError(f"Falta {archivo}. Corré `python -m viabilidad score`.")
+
+    manzanas = pl.read_parquet(config.DIR_PROCESADO / "manzanas.parquet").select(
+        "manzana", "barrio"
+    )
+    predicho = (
+        pl.read_parquet(archivo)
+        .filter(pl.col("rubro") == rubro)
+        .join(manzanas, on="manzana", how="inner")
+        .group_by("barrio")
+        .agg(pl.col("score").mean().alias("predicho"))
+    )
+    observado = (
+        d.group_by("barrio")
+        .agg(pl.len().alias("locales"), pl.col("y").mean().alias("real"))
+        .filter(pl.col("locales") >= MIN_LOCALES_BARRIO)
+    )
+    return (
+        observado.join(predicho, on="barrio", how="inner")
+        .with_columns((pl.col("predicho") - pl.col("real")).alias("error"))
+        .sort("locales", descending=True)
+    )
+
+
+def ejecutar_calibracion(rubro: str = "bar_restaurante") -> pl.DataFrame:
+    t = calibracion_por_barrio(rubro)
+    print(f"\n{'=' * 72}\n  El mapa contra la realidad, por barrio — {rubro}\n{'=' * 72}\n")
+    with pl.Config(tbl_rows=25, fmt_str_lengths=22, tbl_hide_dataframe_shape=True):
+        print(
+            t.select(
+                "barrio",
+                "locales",
+                pl.col("real").round(3),
+                pl.col("predicho").round(3),
+                pl.col("error").round(3),
+            )
+        )
+    import numpy as np
+
+    r = float(np.corrcoef(t["predicho"].to_numpy(), t["real"].to_numpy())[0, 1])
+    print(
+        f"\ncorrelación entre predicho y real: {r:+.3f}\n\n"
+        "El modelo ordena bien los barrios pero comprime hacia la media: con un\n"
+        "techo de 0,61 de AUC no puede jugarse predicciones extremas sin\n"
+        "sobreajustar. Y los barrios con más locales del rubro son los de menor\n"
+        "supervivencia individual: un corredor bueno rota más rápido. El score\n"
+        "mide si el negocio sobrevive, no si la ubicación es buena."
+    )
+    return t
