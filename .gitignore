@@ -153,4 +153,6 @@ __pycache__/
 venv/
 .ruff_cache/
 .pytest_cache/
-mapa/datos.js
+# mapa/datos.js se versiona: lo sirve GitHub Pages y sin el la pagina
+# queda en blanco. Son 1,8 MB de geometria y scores agregados por manzana
+# y rubro, sin titulares ni direcciones.
